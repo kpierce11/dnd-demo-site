@@ -64,6 +64,10 @@ export const DiceRoller: React.FC = () => {
     diceBoxRef.current = null;
   }
 
+  const container = diceContainerRef.current;
+  const existingCanvases = container.querySelectorAll('canvas');
+  existingCanvases.forEach(canvas => canvas.remove());
+
   try {
     // Configure DiceBox with minimal settings
     const config = {
