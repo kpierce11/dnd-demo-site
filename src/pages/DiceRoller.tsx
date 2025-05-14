@@ -107,6 +107,7 @@ export const DiceRoller: React.FC = () => {
                          Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
           }
         }, 100);
+      })
         
         setIsDiceBoxReady(true);
       })
