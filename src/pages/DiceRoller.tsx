@@ -62,6 +62,7 @@ export const DiceRoller: React.FC = () => {
       container: '#dice-box-container',
       assetPath: '/assets/dice-box/',
       theme: 'default',
+      // Add other configurations as needed
       scale: 20,
       gravity: 1,
       throwForce: 6,
@@ -80,9 +81,11 @@ export const DiceRoller: React.FC = () => {
       .then(() => {
         console.log("DiceBox initialized successfully!");
 
-        // After initialization, find the dice canvas and resize it
+        // Find the canvas element created by DiceBox within the container
+        // Instead of relying on a fixed ID 'dice-canvas', find the canvas child
         setTimeout(() => {
-          const diceCanvas = document.getElementById('dice-canvas');
+          const diceCanvas = diceContainerRef.current?.querySelector('canvas'); // MODIFIED LINE
+
           if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
             console.log("Found dice canvas, resizing it");
 
@@ -94,16 +97,21 @@ export const DiceRoller: React.FC = () => {
 
             diceCanvas.style.width = '100%';
             diceCanvas.style.height = '100%';
+            // Keep position absolute if its parent is relative
             diceCanvas.style.position = 'absolute';
             diceCanvas.style.top = '0';
             diceCanvas.style.left = '0';
 
+
             console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
+             // If DiceBox has a method to update its rendering based on canvas resize, call it here.
+             // Based on documentation review, there isn't an explicit method. The canvas resize might be enough.
+             // If dice appear distorted or improperly rendered after resize, further investigation into DiceBox API or potential workarounds might be necessary.
           } else {
-            console.warn("Dice canvas not found or not a canvas element");
-            const allCanvases = document.querySelectorAll('canvas');
-            console.log(`Found ${allCanvases.length} canvas elements:`,
-                         Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+            console.warn("Dice canvas not found within container after initialization.");
+             const allCanvases = document.querySelectorAll('canvas');
+             console.log(`Found ${allCanvases.length} canvas elements in the document:`,
+                          Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
           }
         }, 100); // Short delay to allow rendering
 
@@ -119,11 +127,14 @@ export const DiceRoller: React.FC = () => {
   }
 
   const handleResize = () => {
-    const diceCanvas = document.getElementById('dice-canvas');
+     // Find the canvas element created by DiceBox within the container on resize
+    const diceCanvas = diceContainerRef.current?.querySelector('canvas'); // MODIFIED LINE
+
     if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
       diceCanvas.width = diceContainerRef.current.clientWidth;
       diceCanvas.height = diceContainerRef.current.clientHeight;
       console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
+       // Potentially call a DiceBox resize method if one existed.
     }
   };
 
@@ -279,7 +290,7 @@ export const DiceRoller: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // Added flex flex-col flex-grow
+        className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // flex-grow here is important for layout to work
       >
         <h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
 
@@ -371,7 +382,8 @@ export const DiceRoller: React.FC = () => {
           </div>
         </div>
 
-     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm flex-grow"> {/* Added flex-grow */}
+     {/* Dice Visual Container - added flex-grow */}
+     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm flex-grow">
   {!isDiceBoxReady && (
     <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
       <p>Loading 3D Dice...</p>
@@ -387,15 +399,16 @@ export const DiceRoller: React.FC = () => {
     </div>
   )}
 
+  {/* Dice Box Container - used by DiceBox library */}
   <div ref={diceContainerRef}
        id="dice-box-container"
        className="absolute inset-0"
        style={{
          width: '100%',
          height: '100%',
-         position: 'relative', // Changed to relative to work with absolute child
+         position: 'relative', // Keep relative for absolute canvas child
          overflow: 'hidden'
-         // Removed minHeight and height inline styles
+         // Removed fixed height/minHeight
        }}
   >
     {/* The dice canvas will be appended here by DiceBox */}
@@ -527,9 +540,12 @@ export const DiceRoller: React.FC = () => {
                   {roll.dice}d{roll.diceType}
                   {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
                 </span>
-                <button className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md">
-                  Roll
-                </button>
+                <button
+                    tabIndex={-1}
+                    className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md"
+                  >
+                    Roll
+                  </button>
               </div>
             </div>
           ))}
