@@ -36,93 +36,91 @@ export const DiceRoller: React.FC = () => {
 
 useEffect(() => {
   console.log("DiceRoller: useEffect triggered.");
-  let isEffectActive = true; // To prevent updates if this effect instance is cleaned up
-  let createdBoxInThisRun: DiceBox | null = null;
+  let isThisEffectInstanceStillActive = true;
+  let boxCreatedInThisEffectInstance: DiceBox | null = null;
 
-  // Only proceed if the container div is available
   if (!diceContainerDivRef.current) {
     console.warn("DiceRoller: diceContainerDivRef.current is null. Skipping DiceBox init.");
     return;
   }
 
-  console.log("DiceRoller: Attempting DiceBox Init. diceBoxInstanceRef.current:", diceBoxInstanceRef.current);
+  console.log("DiceRoller: Attempting DiceBox Init. Current diceBoxInstanceRef.current:", diceBoxInstanceRef.current);
 
-  const diceBoxConfig = {
-    id: 'dice-box-container',
-    assetPath: '/assets/dice-box/',
-    theme: 'default',
-    offscreen: true,
-    scale: 30,
-    gravity: 1,
-    throwForce: 5,
-  };
-  console.log("DiceRoller: DiceBox Config being used:", diceBoxConfig);
+  // If there's already an instance (likely from the first pass of StrictMode that hasn't cleaned up yet,
+  // or a lingering one), we don't want to create a new one on top immediately without proper cleanup.
+  // However, StrictMode will run cleanup then setup again, so diceBoxInstanceRef.current should be null on the "second" setup.
+  // The current logs show it IS null on the second run, which is good.
 
-  const newDiceBox = new DiceBox(diceBoxConfig);
-  createdBoxInThisRun = newDiceBox;
-  // Update the ref immediately. If another effect run cleans up,
-  // it will null out the ref. This specific instance's init promise
-  // will then see that diceBoxInstanceRef.current !== newDiceBox.
-  diceBoxInstanceRef.current = newDiceBox;
-  setIsDiceBoxReady(false); // Assume not ready until init completes
+  const diceBoxConfig = { /* ... your config ... */ };
+  // console.log("DiceRoller: DiceBox Config:", diceBoxConfig); // Keep if useful
 
-  newDiceBox.init()
+  const newBox = new DiceBox(diceBoxConfig);
+  boxCreatedInThisEffectInstance = newBox;
+
+  // Set this as the current main instance.
+  // If StrictMode causes a cleanup and re-run, the *new* effect run will do this again.
+  diceBoxInstanceRef.current = newBox;
+  setIsDiceBoxReady(false);
+
+  console.log("DiceRoller: Assigned new DiceBox instance to diceBoxInstanceRef.current", newBox);
+
+  newBox.init()
     .then(() => {
-      if (isEffectActive) { // Check if this specific effect instance is still the "active" one
-        // If the main ref still points to the box created in THIS run, it means
-        // this is likely the "final" setup in StrictMode, or the only setup in prod.
-        if (diceBoxInstanceRef.current === newDiceBox) {
-          console.log("DiceRoller: DiceBox Initialized! SUCCESS!");
+      if (isThisEffectInstanceStillActive) {
+        // Check if the *globally tracked* instance is still the one this effect created.
+        // This ensures that if this is a stale promise resolving (e.g. from 1st strict mode run),
+        // it doesn't incorrectly set isDiceBoxReady if a newer instance is already in charge.
+        if (diceBoxInstanceRef.current === newBox) {
+          console.log("DiceRoller: DiceBox Initialized! SUCCESS! (Instance in ref matches this init)");
           setIsDiceBoxReady(true);
         } else {
-          // The main ref was changed by a subsequent effect run/cleanup.
-          // This instance (newDiceBox) is now orphaned, so clean it up.
-          console.warn("DiceRoller: DiceBox init completed for an instance that is no longer the primary. Cleaning it up.");
-          newDiceBox.clear?.();
+          console.warn("DiceRoller: DiceBox init completed, but diceBoxInstanceRef.current points to a different instance. This instance is orphaned, cleaning it up.", {
+            thisInstance: newBox,
+            currentRefInstance: diceBoxInstanceRef.current
+          });
+          newBox.clear?.();
         }
       } else {
-        // This effect instance was cleaned up before its init completed. Clean up the box it created.
-        console.warn("DiceRoller: DiceBox init completed for a cleaned-up effect. Cleaning up this box.");
-        newDiceBox.clear?.();
+        // This effect was cleaned up before its init completed.
+        console.warn("DiceRoller: DiceBox init completed for an effect that was already cleaned up. Cleaning up this instance.", newBox);
+        newBox.clear?.();
       }
     })
     .catch(err => {
-      if (isEffectActive) {
-        console.error("DiceRoller: DiceBox init FAILED:", err);
-        // If this failed instance is still the one in the ref, nullify it.
-        if (diceBoxInstanceRef.current === newDiceBox) {
-          diceBoxInstanceRef.current = null;
+      if (isThisEffectInstanceStillActive) {
+        console.error("DiceRoller: DiceBox init FAILED for instance:", newBox, err);
+        if (diceBoxInstanceRef.current === newBox) {
+          diceBoxInstanceRef.current = null; // Null out the ref if this failed init was the one it pointed to
         }
         setIsDiceBoxReady(false);
       }
     });
 
   return () => {
-    console.log("DiceRoller: EFFECT CLEANUP for a DiceBox instance.");
-    isEffectActive = false;
+    console.log("DiceRoller: EFFECT CLEANUP for instance created by this effect run:", boxCreatedInThisEffectInstance);
+    isThisEffectInstanceStillActive = false;
 
-    // If the instance being cleaned up is the one this effect created,
-    // and it's also the one currently in the main ref, then it's the "active" one being cleaned up.
-    if (createdBoxInThisRun && diceBoxInstanceRef.current === createdBoxInThisRun) {
-      console.log("DiceRoller: Cleanup - Clearing the primary DiceBox instance.");
+    // If the DiceBox instance this cleanup corresponds to (boxCreatedInThisEffectInstance)
+    // is currently the main one in the ref, then it's the one that needs to be fully cleaned up
+    // and the ref nullified.
+    if (diceBoxInstanceRef.current === boxCreatedInThisEffectInstance) {
+      console.log("DiceRoller: Cleanup - Clearing the primary/current DiceBox instance from ref.");
       try {
-        // It's possible init never finished, so `clear` might not be available.
-        // Check if it was set to ready, or more safely, just try to call clear.
-        createdBoxInThisRun.clear?.();
+        diceBoxInstanceRef.current?.clear?.(); // Use optional chaining on the ref's current value
       } catch (e: any) {
         console.warn("DiceRoller: Cleanup - Error during primary .clear():", e.message);
       }
-      diceBoxInstanceRef.current = null; // Null out the main ref
+      diceBoxInstanceRef.current = null;
       setIsDiceBoxReady(false);
-    } else if (createdBoxInThisRun) {
-      // This effect's instance was superseded or never became the primary.
-      // It should have been cleaned up by its own init promise's else/catch,
-      // but as a fallback, try to clean it here too.
-      console.log("DiceRoller: Cleanup - Clearing a superseded/orphaned DiceBox instance.");
-      createdBoxInThisRun.clear?.();
+    } else if (boxCreatedInThisEffectInstance) {
+      // This specific instance was created by this effect, but it's no longer the main one.
+      // It should have been cleaned by its own promise if it became orphaned,
+      // but try cleaning again just in case.
+      console.log("DiceRoller: Cleanup - This effect's instance was not the primary. Attempting to clear it anyway.", boxCreatedInThisEffectInstance);
+      boxCreatedInThisEffectInstance.clear?.();
     }
   };
-}, []); // Empty dependency array
+}, []);
 
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
