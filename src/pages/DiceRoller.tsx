@@ -104,9 +104,9 @@ export const DiceRoller: React.FC = () => {
             // List all canvases to help debug
             const allCanvases = document.querySelectorAll('canvas');
             console.log(`Found ${allCanvases.length} canvas elements:`, 
-                         Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+               Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+            }
           }
-        }
         }, 100);
       })
         
