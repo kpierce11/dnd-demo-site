@@ -57,7 +57,7 @@ export const DiceRoller: React.FC = () => {
       container: '#dice-box-container',
       assetPath: '/assets/dice-box/',
       theme: 'default',
-      scale: 5,
+      scale: 20,
       gravity: 1,
       throwForce: 6,
       spinForce: 3,
