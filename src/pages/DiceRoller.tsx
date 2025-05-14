@@ -68,72 +68,60 @@ export const DiceRoller: React.FC = () => {
       console.log("Creating new DiceBox with config:", config);
       
       const newDiceBox = new DiceBox(config);
-      diceBoxRef.current = newDiceBox;
-      
-      console.log("Initializing DiceBox...");
-      newDiceBox.init()
-        .then(() => { // Start of .then() for init
-          console.log("DiceBox initialized successfully!");
-          
-          setTimeout(() => {
-            if (diceContainerRef.current) {
-              const canvasEl = diceContainerRef.current.querySelector('canvas');
-              if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-                console.log(`Found DiceBox canvas (ID: ${canvasEl.id || 'none'}), resizing it.`);
-                
-                const containerWidth = diceContainerRef.current.clientWidth;
-                const containerHeight = diceContainerRef.current.clientHeight;
-                
-                canvasEl.width = containerWidth;
-                canvasEl.height = containerHeight;
-                
-                canvasEl.style.width = '100%';
-                canvasEl.style.height = '100%';
-                    
-                console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
-              } else {
-                console.warn("Dice canvas not found or not a canvas element");
-                const allCanvases = document.querySelectorAll('canvas');
-                console.log(`Found ${allCanvases.length} canvas elements:`, 
-                             Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
-              }
-            }
-          }, 100);
-          setIsDiceBoxReady(true); // Moved here
-        }) // End of .then() for init
-        .catch((error) => { // Correctly chained .catch for init()
-          console.error("Failed to initialize DiceBox:", error);
-          setIsDiceBoxReady(false);
-        });
-    } catch (error) {
-      console.error("Error creating DiceBox:", error);
-      setIsDiceBoxReady(false);
-    }
+diceBoxRef.current = newDiceBox;
 
-    const handleResize = () => {
+console.log("Initializing DiceBox...");
+newDiceBox.init()
+  .then(() => { // For successful init
+    console.log("DiceBox initialized successfully!");
+    
+    // The setTimeout for initial canvas check (though we'll modify its contents)
+    setTimeout(() => {
       if (diceContainerRef.current) {
         const canvasEl = diceContainerRef.current.querySelector('canvas');
         if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-          const containerWidth = diceContainerRef.current.clientWidth;
-          const containerHeight = diceContainerRef.current.clientHeight;
-          
-          canvasEl.width = containerWidth;
-          canvasEl.height = containerHeight;
-          // Corrected variable name here:
-          console.log(`Resized dice canvas to ${canvasEl.width}x${canvasEl.height}`);
+          console.log(`DiceBox canvas (ID: ${canvasEl.id || 'none'}) found.`);
+          // We will remove direct width/height setting here
+        } else {
+          console.warn("DiceBox canvas not found within #dice-box-container during initial check.");
         }
       }
-    };
+    }, 100);
     
-    window.addEventListener('resize', handleResize);
+    setIsDiceBoxReady(true);
+  })
+  .catch((error) => { // Catch for init() errors
+    console.error("Failed to initialize DiceBox:", error);
+    setIsDiceBoxReady(false);
+  });
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      // Consider adding a more thorough DiceBox cleanup if the library provides it
-      // e.g., if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
-      //   diceBoxRef.current.destroy();
-      // }
-      diceBoxRef.current = null;
+// ... (rest of the try block and the catch for new DiceBox() errors) ...
+
+// Setup handleResize listener
+const handleResize = () => {
+  // We will modify this function too
+  console.log("Window resize event triggered.");
+  if (diceContainerRef.current) {
+    const canvasEl = diceContainerRef.current.querySelector('canvas');
+    if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+      // We will remove direct width/height setting here
+      console.log(`Resized DiceBox canvas to match container: ${diceContainerRef.current.clientWidth}x${diceContainerRef.current.clientHeight}`);
+    }
+  }
+};
+window.addEventListener('resize', handleResize);
+
+// Cleanup
+return () => {
+  window.removeEventListener('resize', handleResize);
+  if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') { // Or a destroy method if available
+      try {
+        diceBoxRef.current.clear(); // Or destroy()
+      } catch(e) {
+        console.warn("Error during DiceBox cleanup:", e);
+      }
+  }
+  diceBoxRef.current = null;
     };
   }, []);
 
