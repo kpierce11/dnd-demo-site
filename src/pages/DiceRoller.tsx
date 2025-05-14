@@ -34,68 +34,57 @@ export const DiceRoller: React.FC = () => {
   const diceBoxInstanceRef = useRef<DiceBox | null>(null);
   const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
 
-  useEffect(() => {
-    let isEffectStillMounted = true;
+ useEffect(() => {
+  let isActive = true; // Tracks if this specific effect run is still active
+  let anInstanceWasCreatedInThisEffectRun: DiceBox | null = null;
 
-    if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
-      console.log("DiceRoller: EFFECT - Attempting DiceBox Init (Local Assets)");
-      
-      const newBox = new DiceBox({
-        id: 'dice-box-container',
-        assetPath: '/assets/dice-box/',
-        theme: 'default',
-        offscreen: true,
-        scale: 30, 
-        gravity: 1,
-        throwForce: 5, 
+  if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
+    // ... (console.log for attempting init)
+
+    const newBox = new DiceBox({ /* ... your config ... */ });
+    anInstanceWasCreatedInThisEffectRun = newBox; // Store locally for this effect's scope
+    diceBoxInstanceRef.current = newBox; // Share with the component
+    setIsDiceBoxReady(false);
+
+    newBox.init()
+      .then(() => {
+        if (isActive && diceBoxInstanceRef.current === newBox) { // Still active and ref still points to *this* newBox
+          // ... (console.log for success)
+          setIsDiceBoxReady(true);
+        } else {
+          // ... (console.warn for mismatch or unmounted, attempt to clear newBox specifically)
+          newBox.clear?.(); 
+        }
+      })
+      .catch(err => {
+        if (isActive) {
+          // ... (console.error for init failure)
+          if (diceBoxInstanceRef.current === newBox) { // If the main ref still points to this failed box
+            diceBoxInstanceRef.current = null;
+          }
+          setIsDiceBoxReady(false);
+        }
       });
-      
-      diceBoxInstanceRef.current = newBox; 
-      setIsDiceBoxReady(false);
+  } // ... (else logic for existing instance or missing div)
 
-      newBox.init()
-        .then(() => {
-          if (isEffectStillMounted && diceBoxInstanceRef.current === newBox) { 
-            console.log("DiceBox Initialized with LOCAL assets! SUCCESS!");
-            setIsDiceBoxReady(true);
-          } else {
-             console.warn("DiceBox init completed, but instance mismatch or component unmounted. Orphaned instance clear attempted.");
-             newBox.clear?.();
-          }
-        })
-        .catch(err => {
-          if (isEffectStillMounted) {
-            console.error("DiceBox init FAILED (Local Assets):", err);
-            if (diceBoxInstanceRef.current === newBox) {
-              diceBoxInstanceRef.current = null;
-            }
-            setIsDiceBoxReady(false);
-          }
-        });
-    } else {
-      if (diceBoxInstanceRef.current) {
-        console.log("DiceRoller: EFFECT - DiceBox instance already exists.");
-      }
-      if (!diceContainerDivRef.current) {
-        console.warn("DiceRoller: EFFECT - diceContainerDivRef.current is null on attempt.");
+  return () => {
+    isActive = false;
+    // ... (console.log for cleanup)
+    if (anInstanceWasCreatedInThisEffectRun) { // If this effect run created an instance
+      try {
+        // ... (console.log attempt to clear anInstanceWasCreatedInThisEffectRun)
+        anInstanceWasCreatedInThisEffectRun.clear?.();
+      } catch (e: any) {
+        // ... (console.warn for error during clear)
       }
     }
-
-    return () => {
-      isEffectStillMounted = false;
-      console.log("DiceRoller: EFFECT CLEANUP - Cleaning up DiceBox instance.");
-      if (diceBoxInstanceRef.current) {
-        try {
-          diceBoxInstanceRef.current.clear?.(); 
-          console.log("DiceBox instance .clear() called in cleanup.");
-        } catch (e: any) {
-            console.warn("Error during diceBoxInstanceRef.current.clear() in cleanup:", e.message);
-        }
+    // Only null out the shared ref if it's the one this effect managed
+    if (diceBoxInstanceRef.current === anInstanceWasCreatedInThisEffectRun) {
         diceBoxInstanceRef.current = null;
-      }
-      setIsDiceBoxReady(false); 
-    };
-  }, []); 
+    }
+    setIsDiceBoxReady(false); 
+  };
+}, []); // Empty dependency array means this should run once on mount, cleanup on unmount
 
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
