@@ -51,8 +51,14 @@ useEffect(() => {
   // However, StrictMode will run cleanup then setup again, so diceBoxInstanceRef.current should be null on the "second" setup.
   // The current logs show it IS null on the second run, which is good.
 
-  const diceBoxConfig = { /* ... your config ... */ };
-  // console.log("DiceRoller: DiceBox Config:", diceBoxConfig); // Keep if useful
+  const diceBoxConfig = {id: 'dice-box-container',      // Target div ID
+    assetPath: '/assets/dice-box/', // Path to your 3D assets
+    theme: 'default',
+    offscreen: true,
+    scale: 30,                     // Scale of the dice
+    gravity: 1,
+    throwForce: 5,
+};
 
   const newBox = new DiceBox(diceBoxConfig);
   boxCreatedInThisEffectInstance = newBox;
