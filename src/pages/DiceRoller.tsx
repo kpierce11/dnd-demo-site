@@ -33,15 +33,12 @@ export const DiceRoller: React.FC = () => {
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
 	const [showDice, setShowDice] = useState(false);
 
-
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
-
 
 	useEffect(() => {
 		console.log("Starting DiceBox initialization (Full Screen)...");
 
-		// Clean up previous DiceBox instance if it exists
 		if (diceBoxRef.current) {
 			try {
 				// Add check before calling clear
@@ -60,14 +57,15 @@ export const DiceRoller: React.FC = () => {
 		}
 
 		const diceCanvasId = 'dice-box-fullscreen-canvas';
-
-        // We are now relying on DiceBox configuration to create and manage the canvas in the body.
-        // Manual canvas creation and appending is removed from this effect.
-
+		const existingCanvas = document.getElementById(diceCanvasId);
+		if (existingCanvas && existingCanvas.parentNode === document.body) {
+			console.log("Removing existing DiceBox canvas from body before initialization:", existingCanvas);
+			document.body.removeChild(existingCanvas);
+		}
 
 		try {
 			const config = {
-				container: 'body', // DiceBox will look for or create the canvas in the body
+				container: 'body',
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
 				scale: 20,
@@ -76,7 +74,7 @@ export const DiceRoller: React.FC = () => {
 				spinForce: 3,
 				lightIntensity: 0.8,
 				shadowTransparency: 0.8,
-				id: diceCanvasId, // DiceBox will use this ID for the canvas
+				id: diceCanvasId,
 			};
 
 			console.log("Creating new DiceBox with config:", config);
@@ -89,31 +87,32 @@ export const DiceRoller: React.FC = () => {
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
 
-                    // Get the canvas element after DiceBox has initialized it
-                    const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
+					const diceCanvas = document.getElementById(diceCanvasId);
+					if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
+						console.log("Found dice canvas, applying full screen styles");
 
-					if (diceCanvas) {
-						console.log("Found dice canvas after initialization.");
-                        // Initial pointer-events should be none when not rolling
-                        diceCanvas.style.pointerEvents = 'none';
+						diceCanvas.style.position = 'fixed';
+						diceCanvas.style.top = '0';
+						diceCanvas.style.left = '0';
+						diceCanvas.style.width = '100%';
+						diceCanvas.style.height = '100%';
+						diceCanvas.style.zIndex = '1000';
+						diceCanvas.style.pointerEvents = 'none';
 
-                         // Set canvas resolution attributes after init
-                        const windowWidth = window.innerWidth;
-                        const windowHeight = window.innerHeight;
-                        diceCanvas.width = windowWidth;
-                        diceCanvas.height = windowHeight;
-                         console.log(`Attempted to set canvas resolution attributes after init to ${windowWidth}x${windowHeight}`);
+						const windowWidth = window.innerWidth;
+						const windowHeight = window.innerHeight;
+
+						if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+							console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+						} else {
+							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
+						}
+
 					} else {
-						console.warn(`Dice canvas with ID '${diceCanvasId}' not found after DiceBox initialization.`);
-					}
-
-
-					if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-						console.log(`Attempting to resize DiceBox via resize method to ${window.innerWidth}x${window.innerHeight}`);
-                         // Call resize after init
-                        diceBoxRef.current.resize(window.innerWidth, window.innerHeight);
-					} else {
-						console.warn("DiceBox resize method not found or supported.");
+						console.warn(`Dice canvas with ID '${diceCanvasId}' not found after initialization.`);
+						const allBodyCanvases = document.body.querySelectorAll('canvas');
+						console.log(`Found ${allBodyCanvases.length} canvas elements directly in body:`,
+							Array.from(allBodyCanvases).map(c => c.id || 'unnamed canvas'));
 					}
 
 					setIsDiceBoxReady(true);
@@ -128,24 +127,17 @@ export const DiceRoller: React.FC = () => {
 		}
 
 		const handleResize = () => {
-            const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
+			const diceCanvas = document.getElementById(diceCanvasId);
 
 			if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-				console.log("Window resized, found dice canvas");
+				console.log("Window resized, found dice canvas, attempting resize via library if supported");
 				const windowWidth = window.innerWidth;
 				const windowHeight = window.innerHeight;
 
-				// Update canvas resolution on resize (may cause error if OffscreenCanvas is used)
-				diceCanvas.width = windowWidth;
-				diceCanvas.height = windowHeight;
-                console.log(`Updated canvas resolution attributes on resize to ${windowWidth}x${windowHeight}`);
-
-
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-                    diceBoxRef.current.resize(windowWidth, windowHeight);
 				} else {
-					console.warn("DiceBox resize method not found or supported.");
+					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
 				}
 			}
 		};
@@ -154,12 +146,10 @@ export const DiceRoller: React.FC = () => {
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
-
-            // Clean up DiceBox instance
 			if (diceBoxRef.current) {
 				try {
+					// Add check before calling clear
 					if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
-				        console.log("Cleaning up DiceBox instance.");
 						diceBoxRef.current.clear();
 					}
 					if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
@@ -172,8 +162,7 @@ export const DiceRoller: React.FC = () => {
 				}
 			}
 
-            // Clean up the canvas element if DiceBox created it in the body
-			const diceCanvas = document.getElementById(diceCanvasId);
+			const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
 			if (diceCanvas && diceCanvas.parentNode === document.body) {
 				console.log("Removing DiceBox canvas from body during cleanup:", diceCanvas);
 				document.body.removeChild(diceCanvas);
@@ -309,6 +298,7 @@ export const DiceRoller: React.FC = () => {
                     if (diceCanvas) {
                         diceCanvas.style.pointerEvents = 'none';
                     }
+					// Explicitly clear dice from DiceBox after timeout
 					if (diceBoxRef.current) {
 						console.log("Clearing dice after timeout.");
 						diceBoxRef.current.clear();
@@ -559,7 +549,7 @@ export const DiceRoller: React.FC = () => {
 									onClick={() => handleDeleteSavedRoll(index)}
 									aria-label={`Delete saved roll: ${saved.name}`}
 								>
-									X size={14} />
+									<X size={14} />
 								</button>
 
 								<div onClick={() => handleUseSavedRoll(saved)} className="cursor-pointer">
@@ -659,7 +649,7 @@ export const DiceRoller: React.FC = () => {
 							<div className="flex justify-between items-center">
 								<span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
 									{roll.dice}d{roll.diceType}
-									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
+									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ''}
 								</span>
 								<button
 									tabIndex={-1}
@@ -682,4 +672,17 @@ export const DiceRoller: React.FC = () => {
 						</ul>
 					</div>
 					<div>
-						<h3 className="font-bold text-accent">Attack Rolls
+						<h3 className="font-bold text-accent">Attack Rolls</h3>
+						<p className="text-foreground/70 mb-2">d20 + ability modifier + proficiency bonus</p>
+						<ul className="list-disc pl-5 text-sm">
+							<li>Natural 20: Critical Hit (double damage dice)</li>
+							<li>Natural 1: Critical Miss</li>
+						</ul>
+					</div>
+				</div>
+			</motion.div>
+		</div>
+	);
+};
+
+export default DiceRoller;
