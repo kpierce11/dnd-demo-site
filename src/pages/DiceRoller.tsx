@@ -35,22 +35,57 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
- useEffect(() => {
+useEffect(() => {
   if (!diceContainerRef.current) return;
-  
-  console.log("Starting DiceBox initialization...");
   
   // Clean up any existing instance first
   if (diceBoxRef.current) {
-    try {
-      if (typeof diceBoxRef.current.clear === 'function') {
-        diceBoxRef.current.clear();
-      }
-    } catch (e) {
-      console.warn("Error clearing previous DiceBox instance:", e);
-    }
     diceBoxRef.current = null;
   }
+
+  // Simple config with minimal settings
+  const config = {
+    container: '#dice-box-container', 
+    assetPath: '/assets/dice-box/',
+    theme: 'default',
+    scale: 5
+  };
+  
+  // Create DiceBox
+  const newDiceBox = new DiceBox(config);
+  diceBoxRef.current = newDiceBox;
+  
+  // Initialize DiceBox
+  newDiceBox.init()
+    .then(() => {
+      console.log("DiceBox initialized successfully!");
+      
+      // IMPORTANT: After initialization, find and resize the canvas
+      setTimeout(() => {
+        const canvas = document.querySelector('#dice-box-container canvas');
+        if (canvas) {
+          // Set canvas to full container size
+          canvas.style.width = '100%';
+          canvas.style.height = '100%';
+          
+          // Important: Set actual canvas dimensions
+          canvas.width = diceContainerRef.current.clientWidth;
+          canvas.height = diceContainerRef.current.clientHeight;
+        }
+      }, 100);
+      
+      setIsDiceBoxReady(true);
+    })
+    .catch((error) => {
+      console.error("Failed to initialize DiceBox:", error);
+      setIsDiceBoxReady(false);
+    });
+
+  // Clean up
+  return () => {
+    diceBoxRef.current = null;
+  };
+}, []);
 
   try {
     // Only use officially documented configuration options
