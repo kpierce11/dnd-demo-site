@@ -48,7 +48,7 @@ useEffect(() => {
     container: '#dice-box-container', 
     assetPath: '/assets/dice-box/',
     theme: 'default',
-    scale: 5
+    scale: 20
   };
   
   // Create DiceBox
@@ -87,21 +87,7 @@ useEffect(() => {
   };
 }, []);
 
-  try {
-    // Only use officially documented configuration options
-    const config = {
-      container: '#dice-box-container', // This is required
-      assetPath: '/assets/dice-box/',   // Path to assets
-      theme: 'default',                // Use default theme
-      scale: 20,                        // Start with a smaller scale (default is 5)
-      gravity: 1,                      // Default gravity
-      throwForce: 6,                   // Default throw force
-      spinForce: 3,                    // Default spin force
-      lightIntensity: 0.8,             // Default light intensity
-      shadowTransparency: 0.8,         // Default shadow transparency
-    };
 
-    console.log("Creating new DiceBox with config:", config);
     
     // Create new DiceBox instance
     const newDiceBox = new DiceBox(config);
