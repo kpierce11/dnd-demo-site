@@ -40,20 +40,8 @@ export const DiceRoller: React.FC = () => {
   
   console.log("Starting DiceBox initialization...");
   
-  // Check if assets path exists
-  fetch('/assets/dice-box/index.html')
-    .then(response => {
-      if (!response.ok) {
-        console.warn("Assets path may not be accessible:", response.status);
-      } else {
-        console.log("Assets path is accessible");
-      }
-    })
-    .catch(e => console.error("Error checking assets path:", e));
-  
   // Clean up any existing instance first
   if (diceBoxRef.current) {
-    console.log("Cleaning up previous DiceBox instance");
     try {
       if (typeof diceBoxRef.current.clear === 'function') {
         diceBoxRef.current.clear();
@@ -64,54 +52,32 @@ export const DiceRoller: React.FC = () => {
     diceBoxRef.current = null;
   }
 
-  const container = diceContainerRef.current;
-  const existingCanvases = container.querySelectorAll('canvas');
-  existingCanvases.forEach(canvas => canvas.remove());
-
   try {
-    // Configure DiceBox with minimal settings
+    // Only use officially documented configuration options
     const config = {
-      container: '#dice-box-container', 
-      assetPath: '/assets/dice-box/', 
-      scale: 20,
-      gravity: 1,
-      throwForce: 10,
-      shadowTransparency: 0.8,
-      makeUI: false,
-      origin: 'center',
-      radius: 0,
-      dimensions:{
-        w: container.clientWidth,
-        h: container.clientHeight
-      }
+      container: '#dice-box-container', // This is required
+      assetPath: '/assets/dice-box/',   // Path to assets
+      theme: 'default',                // Use default theme
+      scale: 5,                        // Start with a smaller scale (default is 5)
+      gravity: 1,                      // Default gravity
+      throwForce: 6,                   // Default throw force
+      spinForce: 3,                    // Default spin force
+      lightIntensity: 0.8,             // Default light intensity
+      shadowTransparency: 0.8,         // Default shadow transparency
     };
 
     console.log("Creating new DiceBox with config:", config);
     
-    // Create and initialize new DiceBox instance
+    // Create new DiceBox instance
     const newDiceBox = new DiceBox(config);
     diceBoxRef.current = newDiceBox;
     
     // Initialize DiceBox
-    console.log("Calling DiceBox init()...");
-    
+    console.log("Initializing DiceBox...");
     newDiceBox.init()
       .then(() => {
         console.log("DiceBox initialized successfully!");
         setIsDiceBoxReady(true);
-         const canvas = container.querySelector('canvas');
-        if (canvas) {
-          canvas.style.width = "100%";
-          canvas.style.height = "100%";
-          canvas.style.position = "absolute";
-          canvas.style.top = "0";
-          canvas.style.left = "0";
-          canvas.width = container.clientWidth;
-          canvas.height = container.clientHeight;
-           console.log("Canvas positioned and sized:", canvas.width, "x", canvas.height);
-        } else {
-          console.warn("Canvas not found after initialization");
-        }
       })
       .catch((error) => {
         console.error("Failed to initialize DiceBox:", error);
@@ -122,32 +88,10 @@ export const DiceRoller: React.FC = () => {
     setIsDiceBoxReady(false);
   }
 
-    const handleResize = () => {
-    if (diceBoxRef.current && container) {
-      const canvas = container.querySelector('canvas');
-      if (canvas) {
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight;
-        console.log("Canvas resized to:", canvas.width, "x", canvas.height);
-      }
-    }
-  };
-
-    window.addEventListener('resize', handleResize);
-
-  // Clean up on component unmount
+  // Clean up on component unmount - simplified
   return () => {
-    window.removeEventListener('resize', handleResize);
-    console.log("Component unmounting, cleaning up DiceBox...");
     if (diceBoxRef.current) {
-      try {
-        // Only call clear if it exists
-        if (typeof diceBoxRef.current.clear === 'function') {
-          diceBoxRef.current.clear();
-        }
-      } catch (e) {
-        console.warn("Error during cleanup:", e);
-      }
+      // Don't try to call any methods that might not exist
       diceBoxRef.current = null;
     }
   };
