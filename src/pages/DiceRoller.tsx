@@ -35,38 +35,53 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
-  useEffect(() => {
-    if (!diceContainerRef.current) return;
-    
-    // Clean up any existing instance first
-    if (diceBoxRef.current) {
-      try {
-        diceBoxRef.current.clear();
-      } catch (e) {
-        console.warn("Error clearing previous DiceBox instance:", e);
+ useEffect(() => {
+  if (!diceContainerRef.current) return;
+  
+  console.log("Starting DiceBox initialization...");
+  
+  // Check if assets path exists
+  fetch('/assets/dice-box/index.html')
+    .then(response => {
+      if (!response.ok) {
+        console.warn("Assets path may not be accessible:", response.status);
+      } else {
+        console.log("Assets path is accessible");
       }
-      diceBoxRef.current = null;
+    })
+    .catch(e => console.error("Error checking assets path:", e));
+  
+  // Clean up any existing instance first
+  if (diceBoxRef.current) {
+    console.log("Cleaning up previous DiceBox instance");
+    try {
+      if (typeof diceBoxRef.current.clear === 'function') {
+        diceBoxRef.current.clear();
+      }
+    } catch (e) {
+      console.warn("Error clearing previous DiceBox instance:", e);
     }
+    diceBoxRef.current = null;
+  }
 
-    // Configure DiceBox
+  try {
+    // Configure DiceBox with minimal settings
     const config = {
       container: '#dice-box-container', 
-      assetPath: '/assets/dice-box/', // Path to 3D assets
-      theme: 'default',
-      offscreen: false,           // Make sure this is false to see the dice
-      scale: 30,                  // Adjust scale as needed
-      gravity: 1,
-      throwForce: 10,
-      spinForce: 5,
-      lightIntensity: 0.9,        // Brighten the scene
+      assetPath: '/assets/dice-box/', 
+      scale: 5,
       shadowTransparency: 0.8,
     };
 
+    console.log("Creating new DiceBox with config:", config);
+    
     // Create and initialize new DiceBox instance
     const newDiceBox = new DiceBox(config);
     diceBoxRef.current = newDiceBox;
     
     // Initialize DiceBox
+    console.log("Calling DiceBox init()...");
+    
     newDiceBox.init()
       .then(() => {
         console.log("DiceBox initialized successfully!");
@@ -76,23 +91,25 @@ export const DiceRoller: React.FC = () => {
         console.error("Failed to initialize DiceBox:", error);
         setIsDiceBoxReady(false);
       });
+  } catch (error) {
+    console.error("Error creating DiceBox:", error);
+    setIsDiceBoxReady(false);
+  }
 
-    // Clean up on component unmount
-    return () => {
-      if (diceBoxRef.current) {
-        try {
-         if (typeof diceBoxRef.current.clear === 'function') {
-           diceBoxRef.current.clear();
-         } else if (typeof diceBoxRef.current.dispose === 'function') {
-           diceBoxRef.current.dispose();
-         }
-        } catch (e) {
-          console.warn("Error during cleanup:", e);
-        }
-        diceBoxRef.current = null;
+  // Clean up on component unmount
+  return () => {
+    console.log("Component unmounting, cleaning up DiceBox...");
+    if (diceBoxRef.current) {
+      try {
+        // Just remove the reference - don't try to call any methods
+        console.log("Nulling out DiceBox reference");
+      } catch (e) {
+        console.warn("Error during cleanup:", e);
       }
-    };
-  }, []);
+      diceBoxRef.current = null;
+    }
+  };
+}, []);
 
   // Load saved rolls from localStorage
   useEffect(() => {
