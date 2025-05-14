@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAudio } from '../context/AudioContext';
-import { Menu, X, Dice1 as DiceD20Icon, Info, Plus, Save } from 'lucide-react';
+import { Dice1 as DiceD20Icon, Info, Plus, X } from 'lucide-react';
 import DiceBox from '@3d-dice/dice-box';
 
 interface CustomDiceResult {
@@ -34,167 +34,169 @@ export const DiceRoller: React.FC = () => {
   const diceContainerRef = useRef<HTMLDivElement>(null);
   const diceBoxRef = useRef<DiceBox | null>(null);
 
-  useEffect(() => {
-    if (!diceContainerRef.current) return;
+ useEffect(() => {
+  if (!diceContainerRef.current) return;
 
-    console.log("Starting DiceBox initialization...");
+  console.log("Starting DiceBox initialization...");
 
-    // Clean up any existing instance and its canvas elements first
-    if (diceBoxRef.current) {
-      try {
-        if (typeof diceBoxRef.current.clear === 'function') {
-          diceBoxRef.current.clear();
-        }
-        // Attempt more robust cleanup if DiceBox API provides it
-        if (typeof diceBoxRef.current.dispose === 'function') {
-            diceBoxRef.current.dispose();
-        } else if (typeof diceBoxRef.current.destroy === 'function') {
-            diceBoxRef.current.destroy();
-        }
-      } catch (e) {
-        console.warn("Error cleaning up previous DiceBox instance:", e);
+  // Clean up any existing instance and its canvas elements first
+  if (diceBoxRef.current) {
+    try {
+      if (typeof diceBoxRef.current.clear === 'function') {
+        diceBoxRef.current.clear();
       }
-      diceBoxRef.current = null;
+      // Attempt more robust cleanup if DiceBox API provides it
+      if (typeof diceBoxRef.current.dispose === 'function') {
+          diceBoxRef.current.dispose();
+      } else if (typeof diceBoxRef.current.destroy === 'function') {
+          diceBoxRef.current.destroy();
+      }
+    } catch (e) {
+      console.warn("Error cleaning up previous DiceBox instance:", e);
+    }
+    diceBoxRef.current = null;
+  }
+
+   // Explicitly remove any existing canvas elements from the container before creating a new instance
+   // This helps prevent multiple canvases if the effect runs multiple times (e.g., Strict Mode)
+   if (diceContainerRef.current) {
+       const canvases = diceContainerRef.current.querySelectorAll('canvas');
+       canvases.forEach(canvas => {
+           console.log("Removing existing canvas element before initialization:", canvas);
+           diceContainerRef.current?.removeChild(canvas);
+       });
+   }
+
+
+  try {
+    const config = {
+      container: '#dice-box-container',
+      assetPath: '/assets/dice-box/',
+      theme: 'default',
+      // Add other configurations as needed
+      scale: 20,
+      gravity: 1,
+      throwForce: 6,
+      spinForce: 3,
+      lightIntensity: 0.8,
+      shadowTransparency: 0.8,
+    };
+
+    console.log("Creating new DiceBox with config:", config);
+
+    const newDiceBox = new DiceBox(config);
+    diceBoxRef.current = newDiceBox;
+
+    console.log("Initializing DiceBox...");
+    newDiceBox.init()
+      .then(() => {
+        console.log("DiceBox initialized successfully!");
+
+        // Apply styles to the canvas container to fill its parent.
+        // The canvas element itself will be managed by DiceBox via OffscreenCanvas.
+        // We no longer directly set canvas width/height attributes here.
+
+        // Find the canvas element created by DiceBox within the container
+        // This is still needed to apply CSS styles to the canvas element itself
+        setTimeout(() => {
+          const diceCanvas = diceContainerRef.current?.querySelector('canvas');
+
+          if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
+            console.log("Found dice canvas, applying styles and attempting resize via library if supported");
+
+            // Apply styles to make canvas fill its container (CSS handles sizing)
+            diceCanvas.style.width = '100%';
+            diceCanvas.style.height = '100%';
+            diceCanvas.style.position = 'absolute'; // Should match container's positioning context
+            diceCanvas.style.top = '0';
+            diceCanvas.style.left = '0';
+
+            // Get current container dimensions to potentially inform the library
+            const containerWidth = diceContainerRef.current.clientWidth;
+            const containerHeight = diceContainerRef.current.clientHeight;
+
+            // *** Attempt to resize via DiceBox API ***
+            // The console output indicates this method is not found or supported in this version.
+            // We rely on CSS and the library's potential internal handling of container size changes.
+            if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+                console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
+                // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
+            } else {
+                console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
+            }
+
+          } else {
+            console.warn("Dice canvas not found within container after initialization.");
+             const allCanvases = document.querySelectorAll('canvas');
+             console.log(`Found ${allCanvases.length} canvas elements in the document:`,
+                          Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+          }
+        }, 100); // Short delay to allow rendering
+
+        setIsDiceBoxReady(true);
+      })
+      .catch((error) => {
+        console.error("Failed to initialize DiceBox:", error);
+        setIsDiceBoxReady(false);
+      });
+  } catch (error) {
+    console.error("Error creating DiceBox:", error);
+    setIsDiceBoxReady(false);
+  }
+
+  const handleResize = () => {
+     // Find the canvas element created by DiceBox within the container on resize
+    const diceCanvas = diceContainerRef.current?.querySelector('canvas');
+
+    if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
+      console.log("Window resized, found dice canvas, attempting resize via library if supported");
+      const containerWidth = diceContainerRef.current.clientWidth;
+      const containerHeight = diceContainerRef.current.clientHeight;
+
+       // *** Attempt to resize via DiceBox API on window resize ***
+       // The console output indicates this method is not found or supported in this version.
+       // We rely on CSS for sizing and the library's potential internal handling.
+       if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+           console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
+           // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
+       } else {
+           console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
+       }
+    }
+  };
+
+  window.addEventListener('resize', handleResize);
+
+  return () => {
+    window.removeEventListener('resize', handleResize);
+    if (diceBoxRef.current) {
+       try {
+          if (typeof diceBoxRef.current.clear === 'function') {
+            diceBoxRef.current.clear();
+          }
+          if (typeof diceBoxRef.current.dispose === 'function') {
+              diceBoxRef.current.dispose();
+          } else if (typeof diceBoxRef.current.destroy === 'function') {
+              diceBoxRef.current.destroy();
+          }
+       } catch (e) {
+           console.warn("Error disposing of DiceBox instance:", e);
+       }
     }
 
-    // Explicitly remove any existing canvas elements from the container before creating a new instance
-    // This helps prevent multiple canvases if the effect runs multiple times (e.g., Strict Mode)
+    // Explicitly remove canvas elements from the container during cleanup
     if (diceContainerRef.current) {
         const canvases = diceContainerRef.current.querySelectorAll('canvas');
         canvases.forEach(canvas => {
-            console.log("Removing existing canvas element before initialization:", canvas);
+            console.log("Removing canvas element:", canvas);
             diceContainerRef.current?.removeChild(canvas);
         });
     }
 
-    try {
-      const config = {
-        container: '#dice-box-container',
-        assetPath: '/assets/dice-box/',
-        theme: 'default',
-        // Add other configurations as needed
-        scale: 20,
-        gravity: 1,
-        throwForce: 6,
-        spinForce: 3,
-        lightIntensity: 0.8,
-        shadowTransparency: 0.8,
-      };
+    diceBoxRef.current = null;
+  };
+}, []); // Empty dependency array means this effect runs only on mount and unmount
 
-      console.log("Creating new DiceBox with config:", config);
-
-      const newDiceBox = new DiceBox(config);
-      diceBoxRef.current = newDiceBox;
-
-      console.log("Initializing DiceBox...");
-      newDiceBox.init()
-        .then(() => {
-          console.log("DiceBox initialized successfully!");
-
-          // Apply styles to the canvas container to fill its parent.
-          // The canvas element itself will be managed by DiceBox via OffscreenCanvas.
-          // We no longer directly set canvas width/height attributes here.
-
-          // Find the canvas element created by DiceBox within the container
-          // This is still needed to apply CSS styles to the canvas element itself
-          setTimeout(() => {
-            const diceCanvas = diceContainerRef.current?.querySelector('canvas');
-
-            if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-              console.log("Found dice canvas, applying styles and attempting resize via library if supported");
-
-              // Apply styles to make canvas fill its container (CSS handles sizing)
-              diceCanvas.style.width = '100%';
-              diceCanvas.style.height = '100%';
-              diceCanvas.style.position = 'absolute'; // Should match container's positioning context
-              diceCanvas.style.top = '0';
-              diceCanvas.style.left = '0';
-
-              // Get current container dimensions to potentially inform the library
-              const containerWidth = diceContainerRef.current.clientWidth;
-              const containerHeight = diceContainerRef.current.clientHeight;
-
-              // *** Attempt to resize via DiceBox API ***
-              // The console output indicates this method is not found or supported in this version.
-              // We rely on CSS and the library's potential internal handling of container size changes.
-              if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-                  console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
-                  // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
-              } else {
-                  console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
-              }
-
-            } else {
-              console.warn("Dice canvas not found within container after initialization.");
-               const allCanvases = document.querySelectorAll('canvas');
-               console.log(`Found ${allCanvases.length} canvas elements in the document:`,
-                            Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
-            }
-          }, 100); // Short delay to allow rendering
-
-          setIsDiceBoxReady(true);
-        })
-        .catch((error) => {
-          console.error("Failed to initialize DiceBox:", error);
-          setIsDiceBoxReady(false);
-        });
-    } catch (error) {
-      console.error("Error creating DiceBox:", error);
-      setIsDiceBoxReady(false);
-    }
-
-    const handleResize = () => {
-       // Find the canvas element created by DiceBox within the container on resize
-      const diceCanvas = diceContainerRef.current?.querySelector('canvas');
-
-      if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-        console.log("Window resized, found dice canvas, attempting resize via library if supported");
-        const containerWidth = diceContainerRef.current.clientWidth;
-        const containerHeight = diceContainerRef.current.clientHeight;
-
-         // *** Attempt to resize via DiceBox API on window resize ***
-         // The console output indicates this method is not found or supported in this version.
-         // We rely on CSS for sizing and the library's potential internal handling.
-         if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-             console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
-             // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
-         } else {
-             console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
-         }
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (diceBoxRef.current) {
-         try {
-            if (typeof diceBoxRef.current.clear === 'function') {
-              diceBoxRef.current.clear();
-            }
-            if (typeof diceBoxRef.current.dispose === 'function') {
-                diceBoxRef.current.dispose();
-            } else if (typeof diceBoxRef.current.destroy === 'function') {
-                diceBoxRef.current.destroy();
-            }
-         } catch (e) {
-             console.warn("Error disposing of DiceBox instance:", e);
-         }
-      }
-
-      // Explicitly remove canvas elements from the container during cleanup
-      if (diceContainerRef.current) {
-          const canvases = diceContainerRef.current.querySelectorAll('canvas');
-          canvases.forEach(canvas => {
-              console.log("Removing canvas element:", canvas);
-              diceContainerRef.current?.removeChild(canvas);
-          });
-      }
-
-      diceBoxRef.current = null;
-    };
-  }, []); // Empty dependency array means this effect runs only on mount and unmount
 
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
@@ -324,228 +326,227 @@ export const DiceRoller: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow"
-        >
-          <h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // flex-grow here is important for layout to work
+      >
+        <h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
 
-          <div className="mb-8">
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button
-                className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50"
-                onClick={() => rollDice()}
-                disabled={isRolling || !isDiceBoxReady}
-              >
-                <DiceD20Icon size={20} />
-                <span>
-                  Roll {numberOfDice}d{diceType}
-                  {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
-                  {diceType === 20 && advantage !== 'normal' ?
-                    ` (${advantage === 'advantage' ? 'Advantage' : 'Disadvantage'})` : ''}
-                </span>
-              </button>
-
-              <button
-                className="bg-secondary hover:bg-secondary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300"
-                onClick={() => setShowSaveDialog(true)}
-                disabled={isRolling || !isDiceBoxReady}
-              >
-                <Plus size={20} className="mr-2" />
-                <span>Save Roll</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Dice Visual Container - added flex-grow */}
-          <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm flex-grow">
-            {!isDiceBoxReady && (
-              <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
-                <p>Loading 3D Dice...</p>
-              </div>
-            )}
-
-            {isDiceBoxReady && diceResults.length === 0 && !isRolling && !total && (
-              <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
-                <p className="flex items-center">
-                  <Info size={20} className="mr-2" />
-                  Roll the dice!
-                </p>
-              </div>
-            )}
-
-            {/* Dice Box Container - used by DiceBox library */}
-            <div ref={diceContainerRef}
-                 id="dice-box-container"
-                 className="absolute inset-0"
-                 style={{
-                   width: '100%',
-                   height: '100%',
-                   position: 'relative', // Keep relative for absolute canvas child
-                   overflow: 'hidden'
-                   // Removed fixed height/minHeight
-                 }}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50"
+              onClick={() => rollDice()}
+              disabled={isRolling || !isDiceBoxReady}
             >
-              {/* The dice canvas will be appended here by DiceBox */}
-            </div>
-          </div>
+              <DiceD20Icon size={20} />
+              <span>
+                Roll {numberOfDice}d{diceType}
+                {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
+                {diceType === 20 && advantage !== 'normal' ?
+                  ` (${advantage === 'advantage' ? 'Advantage' : 'Disadvantage'})` : ''}
+              </span>
+            </button>
 
-          {total !== null && !isRolling && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center mb-6"
+            <button
+              className="bg-secondary hover:bg-secondary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300"
+              onClick={() => setShowSaveDialog(true)}
+              disabled={isRolling || !isDiceBoxReady}
             >
-              <p className="text-xl">
-                Result: <span className="font-bold text-3xl text-accent glow-text">{total}</span>
-              </p>
-              <p className="text-foreground/70 text-sm">
-                ({getResultsString()})
-                {modifier !== 0 ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : ''}
-              </p>
-            </motion.div>
-          )}
-
-          <div>
-            <h3 className="text-xl font-bold mb-3">Saved Rolls</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {savedRolls.map((saved, index) => (
-                <div key={index} className="bg-muted/30 rounded-lg p-3 group relative">
-                  <button
-                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-error/20 hover:bg-error rounded-full p-1 z-10"
-                    onClick={() => handleDeleteSavedRoll(index)}
-                    aria-label={`Delete saved roll: ${saved.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-
-                  <div onClick={() => handleUseSavedRoll(saved)} className="cursor-pointer">
-                    <h4 className="font-bold">{saved.name}</h4>
-                    <p className="text-sm text-foreground/70">
-                      {saved.dice}d{saved.diceType}
-                      {saved.modifier !== 0 ? (saved.modifier > 0 ? `+${saved.modifier}` : modifier) : ''}
-                    </p>
-                    <button
-                      tabIndex={-1}
-                      className="mt-2 bg-primary/50 hover:bg-primary text-white py-1 px-3 rounded-md text-sm w-full"
-                    >
-                      Roll
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <Plus size={20} className="mr-2" />
+              <span>Save Roll</span>
+            </button>
           </div>
+        </div>
 
-          {showSaveDialog && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowSaveDialog(false)}
-            >
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-                className="magical-card p-6 max-w-md w-full"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-xl font-bold mb-4">Save Roll Configuration</h3>
-                <p className="mb-4 text-foreground/70">
-                  Current: {numberOfDice}d{diceType}
-                  {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
-                </p>
+     {/* Dice Visual Container - added flex-grow */}
+     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm flex-grow">
+  {!isDiceBoxReady && (
+    <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
+      <p>Loading 3D Dice...</p>
+    </div>
+  )}
 
-                <div className="mb-4">
-                  <label htmlFor="rollName" className="block mb-2">Roll Name:</label>
-                  <input
-                    id="rollName"
-                    type="text"
-                    className="w-full p-2 bg-muted text-foreground rounded-md"
-                    value={newRollName}
-                    onChange={(e) => setNewRollName(e.target.value)}
-                    placeholder="e.g., Greatsword Attack"
-                  />
-                </div>
+  {isDiceBoxReady && diceResults.length === 0 && !isRolling && !total && (
+    <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
+      <p className="flex items-center">
+        <Info size={20} className="mr-2" />
+        Roll the dice!
+      </p>
+    </div>
+  )}
 
-                <div className="flex justify-end gap-3">
+  {/* Dice Box Container - used by DiceBox library */}
+  <div ref={diceContainerRef}
+       id="dice-box-container"
+       className="absolute inset-0"
+       style={{
+         width: '100%',
+         height: '100%',
+         position: 'relative', // Keep relative for absolute canvas child
+         overflow: 'hidden'
+         // Removed fixed height/minHeight
+       }}
+  >
+    {/* The dice canvas will be appended here by DiceBox */}
+  </div>
+</div>
+
+
+        {total !== null && !isRolling && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center mb-6"
+          >
+            <p className="text-xl">
+              Result: <span className="font-bold text-3xl text-accent glow-text">{total}</span>
+            </p>
+            <p className="text-foreground/70 text-sm">
+              ({getResultsString()})
+              {modifier !== 0 ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : ''}
+            </p>
+          </motion.div>
+        )}
+
+        <div>
+          <h3 className="text-xl font-bold mb-3">Saved Rolls</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {savedRolls.map((saved, index) => (
+              <div key={index} className="bg-muted/30 rounded-lg p-3 group relative">
+                <button
+                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-error/20 hover:bg-error rounded-full p-1 z-10"
+                  onClick={() => handleDeleteSavedRoll(index)}
+                  aria-label={`Delete saved roll: ${saved.name}`}
+                >
+                  <X size={14} />
+                </button>
+
+                <div onClick={() => handleUseSavedRoll(saved)} className="cursor-pointer">
+                  <h4 className="font-bold">{saved.name}</h4>
+                  <p className="text-sm text-foreground/70">
+                    {saved.dice}d{saved.diceType}
+                    {saved.modifier !== 0 ? (saved.modifier > 0 ? `+${saved.modifier}` : modifier) : ''}
+                  </p>
                   <button
-                    className="bg-muted hover:bg-muted/70 text-foreground py-2 px-4 rounded-md"
-                    onClick={() => setShowSaveDialog(false)}
+                    tabIndex={-1}
+                    className="mt-2 bg-primary/50 hover:bg-primary text-white py-1 px-3 rounded-md text-sm w-full"
                   >
-                    Cancel
+                    Roll
                   </button>
-                  <button
-                    className="bg-primary hover:bg-primary/80 text-white py-2 px-4 rounded-md"
-                    onClick={handleSaveRoll}
-                    disabled={!newRollName.trim()}
-                  >
-                    Save
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="magical-card p-6"
-        >
-          <h2 className="text-xl font-bold mb-4">Common Dice Rolls</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            {commonRolls.map((roll, index) => (
-              <div
-                key={index}
-                className="bg-muted/30 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                onClick={() => handleUseSavedRoll(roll)}
-              >
-                <h3 className="font-bold text-accent mb-1">{roll.name}</h3>
-                <p className="text-sm text-foreground/70 mb-2">{roll.description}</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
-                    {roll.dice}d{roll.diceType}
-                    {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
-                  </span>
-                  <button
-                      tabIndex={-1}
-                      className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md"
-                    >
-                      Roll
-                    </button>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-bold text-accent">Ability Checks & Saving Throws</h3>
-              <p className="text-foreground/70 mb-2">d20 + ability modifier (+ proficiency bonus if proficient)</p>
-              <ul className="list-disc pl-5 text-sm">
-                <li>Natural 20: Critical Success</li>
-                <li>Natural 1: Critical Miss</li>
-              </ul>
+      <AnimatePresence>
+        {showSaveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowSaveDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="magical-card p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-4">Save Roll Configuration</h3>
+              <p className="mb-4 text-foreground/70">
+                Current: {numberOfDice}d{diceType}
+                {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
+              </p>
+
+              <div className="mb-4">
+                <label htmlFor="rollName" className="block mb-2">Roll Name:</label>
+                <input
+                  id="rollName"
+                  type="text"
+                  className="w-full p-2 bg-muted text-foreground rounded-md"
+                  value={newRollName}
+                  onChange={(e) => setNewRollName(e.target.value)}
+                  placeholder="e.g., Greatsword Attack"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  className="bg-muted hover:bg-muted/70 text-foreground py-2 px-4 rounded-md"
+                  onClick={() => setShowSaveDialog(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="bg-primary hover:bg-primary/80 text-white py-2 px-4 rounded-md"
+                  onClick={handleSaveRoll}
+                  disabled={!newRollName.trim()}
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="magical-card p-6"
+      >
+        <h2 className="text-xl font-bold mb-4">Common Dice Rolls</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {commonRolls.map((roll, index) => (
+            <div
+              key={index}
+              className="bg-muted/30 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => handleUseSavedRoll(roll)}
+            >
+              <h3 className="font-bold text-accent mb-1">{roll.name}</h3>
+              <p className="text-sm text-foreground/70 mb-2">{roll.description}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
+                  {roll.dice}d{roll.diceType}
+                  {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
+                </span>
+                <button
+                    tabIndex={-1}
+                    className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md"
+                  >
+                    Roll
+                  </button>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-accent">Attack Rolls</h3>
-              <p className="text-foreground/70 mb-2">d20 + ability modifier + proficiency bonus</p>
-              <ul className="list-disc pl-5 text-sm">
-                <li>Natural 20: Critical Hit (double damage dice)</li>
-                <li>Natural 1: Critical Miss</li>
-              </ul>
-            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-bold text-accent">Ability Checks & Saving Throws</h3>
+            <p className="text-foreground/70 mb-2">d20 + ability modifier (+ proficiency bonus if proficient)</p>
+            <ul className="list-disc pl-5 text-sm">
+              <li>Natural 20: Critical Success</li>
+              <li>Natural 1: Critical Miss</li>
+            </ul>
           </div>
-        </motion.div>
-      </AnimatePresence>
+          <div>
+            <h3 className="font-bold text-accent">Attack Rolls</h3>
+            <p className="text-foreground/70 mb-2">d20 + ability modifier + proficiency bonus</p>
+            <ul className="list-disc pl-5 text-sm">
+              <li>Natural 20: Critical Hit (double damage dice)</li>
+              <li>Natural 1: Critical Miss</li>
+            </ul>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };
