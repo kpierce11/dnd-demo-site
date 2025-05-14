@@ -89,7 +89,7 @@ export const DiceRoller: React.FC = () => {
       const instanceToClean = diceBoxInstanceRef.current;
       if (instanceToClean) {
         console.log("Cleaning DiceBox instance.");
-        instanceToClean.clear?.();
+        ///instanceToClean.clear?.();
         // If DiceBox has a destroy method, call it here: instanceToClean.destroy?.();
         // This would ideally remove its canvas.
         // For now, we rely on React unmounting the container div.
