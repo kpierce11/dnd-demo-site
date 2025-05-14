@@ -39,7 +39,7 @@ export const DiceRoller: React.FC = () => {
 
   console.log("Starting DiceBox initialization...");
 
-  // Clean up any existing instance first
+  // Clean up any existing instance and its canvas elements first
   if (diceBoxRef.current) {
     try {
       if (typeof diceBoxRef.current.clear === 'function') {
@@ -56,6 +56,17 @@ export const DiceRoller: React.FC = () => {
     }
     diceBoxRef.current = null;
   }
+
+   // Explicitly remove any existing canvas elements from the container before creating a new instance
+   // This helps prevent multiple canvases if the effect runs multiple times (e.g., Strict Mode)
+   if (diceContainerRef.current) {
+       const canvases = diceContainerRef.current.querySelectorAll('canvas');
+       canvases.forEach(canvas => {
+           console.log("Removing existing canvas element before initialization:", canvas);
+           diceContainerRef.current?.removeChild(canvas);
+       });
+   }
+
 
   try {
     const config = {
@@ -105,13 +116,13 @@ export const DiceRoller: React.FC = () => {
             const containerHeight = diceContainerRef.current.clientHeight;
 
             // *** Attempt to resize via DiceBox API ***
-            // Check if a resize method exists on the DiceBox instance
+            // The console output indicates this method is not found or supported in this version.
+            // We rely on CSS and the library's potential internal handling of container size changes.
             if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
                 console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
-                diceBoxRef.current.resize(containerWidth, containerHeight); // Call the hypothetical resize method
+                // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
             } else {
                 console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
-                // If no resize method, we rely on the library to potentially pick up the DOM element's size changes via its own internal mechanisms.
             }
 
           } else {
@@ -143,9 +154,11 @@ export const DiceRoller: React.FC = () => {
       const containerHeight = diceContainerRef.current.clientHeight;
 
        // *** Attempt to resize via DiceBox API on window resize ***
+       // The console output indicates this method is not found or supported in this version.
+       // We rely on CSS for sizing and the library's potential internal handling.
        if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
            console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
-           diceBoxRef.current.resize(containerWidth, containerHeight); // Call the hypothetical resize method
+           // diceBoxRef.current.resize(containerWidth, containerHeight); // Method not found - comment out or remove call
        } else {
            console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
        }
@@ -158,6 +171,9 @@ export const DiceRoller: React.FC = () => {
     window.removeEventListener('resize', handleResize);
     if (diceBoxRef.current) {
        try {
+          if (typeof diceBoxRef.current.clear === 'function') {
+            diceBoxRef.current.clear();
+          }
           if (typeof diceBoxRef.current.dispose === 'function') {
               diceBoxRef.current.dispose();
           } else if (typeof diceBoxRef.current.destroy === 'function') {
@@ -167,9 +183,19 @@ export const DiceRoller: React.FC = () => {
            console.warn("Error disposing of DiceBox instance:", e);
        }
     }
+
+    // Explicitly remove canvas elements from the container during cleanup
+    if (diceContainerRef.current) {
+        const canvases = diceContainerRef.current.querySelectorAll('canvas');
+        canvases.forEach(canvas => {
+            console.log("Removing canvas element:", canvas);
+            diceContainerRef.current?.removeChild(canvas);
+        });
+    }
+
     diceBoxRef.current = null;
   };
-}, []);
+}, []); // Empty dependency array means this effect runs only on mount and unmount
 
 
   useEffect(() => {
@@ -309,67 +335,6 @@ export const DiceRoller: React.FC = () => {
         <h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
 
         <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center mb-6 gap-4 flex-wrap">
-            <div className="flex items-center">
-              <label htmlFor="diceCount" className="mr-2 w-auto md:w-20">Dice:</label>
-              <select
-                id="diceCount"
-                className="bg-muted text-foreground p-2 rounded-md w-20"
-                value={numberOfDice}
-                onChange={(e) => setNumberOfDice(parseInt(e.target.value))}
-                disabled={isRolling || !isDiceBoxReady}
-              >
-                {Array.from({ length: 20 }, (_, i) => i + 1).map(num => (
-                  <option key={num} value={num}>{num}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center">
-              <span className="mx-2 text-xl">d</span>
-              <select
-                className="bg-muted text-foreground p-2 rounded-md w-20"
-                value={diceType}
-                onChange={(e) => {
-                  const newType = parseInt(e.target.value);
-                  setDiceType(newType);
-                  if (newType !== 20) setAdvantage('normal');
-                }}
-                disabled={isRolling || !isDiceBoxReady}
-              >
-                {[4, 6, 8, 10, 12, 20, 100].map(typeValue => (
-                  <option key={typeValue} value={typeValue}>{typeValue}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-center">
-              <span className="mx-2 text-xl">+</span>
-              <input
-                type="number"
-                className="bg-muted text-foreground p-2 rounded-md w-20"
-                value={modifier}
-                onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
-                disabled={isRolling || !isDiceBoxReady}
-              />
-            </div>
-
-            {diceType === 20 && (
-              <div className="flex items-center ml-0 md:ml-4">
-                <select
-                  className="bg-muted text-foreground p-2 rounded-md w-full md:w-40"
-                  value={advantage}
-                  onChange={(e) => setAdvantage(e.target.value)}
-                  disabled={isRolling || !isDiceBoxReady}
-                >
-                  <option value="normal">Normal Roll</option>
-                  <option value="advantage">Advantage</option>
-                  <option value="disadvantage">Disadvantage</option>
-                </select>
-              </div>
-            )}
-          </div>
-
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
               className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50"
@@ -528,9 +493,7 @@ export const DiceRoller: React.FC = () => {
                 </button>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -571,7 +534,7 @@ export const DiceRoller: React.FC = () => {
             <p className="text-foreground/70 mb-2">d20 + ability modifier (+ proficiency bonus if proficient)</p>
             <ul className="list-disc pl-5 text-sm">
               <li>Natural 20: Critical Success</li>
-              <li>Natural 1: Critical Failure</li>
+              <li>Natural 1: Critical Miss</li>
             </ul>
           </div>
           <div>
