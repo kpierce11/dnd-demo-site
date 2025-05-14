@@ -385,28 +385,37 @@ export const DiceRoller: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm"
-             style={{ minHeight: '300px', height: '300px', width: '100%' }}>
-          {!isDiceBoxReady && (
-            <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
-              <p>Loading 3D Dice...</p>
-            </div>
-          )}
-          
-          {isDiceBoxReady && diceResults.length === 0 && !isRolling && !total && (
-            <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
-              <p className="flex items-center">
-                <Info size={20} className="mr-2" />
-                Roll the dice!
-              </p>
-            </div>
-          )}
-          
-          <div ref={diceContainerRef}
-               id="dice-box-container"
-               style={{ width: '100%', height: '100%', position: 'relative' }}
-          />
-        </div>
+     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm"
+     style={{ minHeight: '300px', height: '300px', width: '100%' }}>
+  {!isDiceBoxReady && (
+    <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
+      <p>Loading 3D Dice...</p>
+    </div>
+  )}
+  
+  {isDiceBoxReady && diceResults.length === 0 && !isRolling && !total && (
+    <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
+      <p className="flex items-center">
+        <Info size={20} className="mr-2" />
+        Roll the dice!
+      </p>
+    </div>
+  )}
+  
+  <div ref={diceContainerRef}
+       id="dice-box-container"
+       style={{ 
+         width: '100%', 
+         height: '100%', 
+         position: 'absolute',
+         top: 0,
+         left: 0,
+         right: 0,
+         bottom: 0,
+         overflow: 'hidden'
+       }}
+  />
+</div>
         
         {total !== null && !isRolling && (
           <motion.div 
