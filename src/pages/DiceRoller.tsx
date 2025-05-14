@@ -31,6 +31,8 @@ export const DiceRoller: React.FC = () => {
 	const [showSaveDialog, setShowSaveDialog] = useState(false);
 	const [advantage, setAdvantage] = useState<string>('normal');
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
+	const [showDice, setShowDice] = useState(false); // New state to control dice visibility
+
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
@@ -198,11 +200,13 @@ export const DiceRoller: React.FC = () => {
 	}, [savedRolls]);
 
 	const handleOverlayClick = () => {
-		if (diceBoxRef.current && !isRolling) {
-            console.log("Overlay clicked, attempting to clear dice. isRolling:", isRolling);
+		if (diceBoxRef.current && !isRolling && showDice) {
+            console.log("Overlay clicked, attempting to clear dice. isRolling:", isRolling, "showDice:", showDice);
 			diceBoxRef.current.clear();
 			setDiceResults([]);
 			setTotal(null);
+			setShowDice(false); // Hide dice on overlay click
+
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
@@ -220,6 +224,7 @@ export const DiceRoller: React.FC = () => {
 		setIsRolling(true);
 		setTotal(null);
 		setDiceResults([]);
+		setShowDice(true); // Show dice when rolling starts
 		playSound('diceRoll');
 
 		const numDice = customRoll?.dice || numberOfDice;
@@ -285,12 +290,20 @@ export const DiceRoller: React.FC = () => {
                 console.log("Roll complete:", results);
                 playSound('success');
                 setIsRolling(false);
-                // Pointer events remain 'auto' for the overlay to handle the click
+                // Start timer to hide dice after 1 second
+                setTimeout(() => {
+                    setShowDice(false);
+                    const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+                    if (diceCanvas) {
+                        diceCanvas.style.pointerEvents = 'none';
+                    }
+                }, 1000);
             };
 
 		} catch (error) {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
+            setShowDice(false); // Hide dice on error
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
@@ -368,7 +381,7 @@ export const DiceRoller: React.FC = () => {
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
 			{/* Overlay div to capture clicks when result is visible and not rolling */}
-            {total !== null && !isRolling && (
+            {total !== null && !isRolling && showDice && (
                 <div
                     className="fixed inset-0 z-[999] cursor-pointer"
                     onClick={handleOverlayClick}
