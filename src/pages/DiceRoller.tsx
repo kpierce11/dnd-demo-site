@@ -35,7 +35,7 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
- useEffect(() => {
+  useEffect(() => {
     if (!diceContainerRef.current) return;
     
     console.log("Starting DiceBox initialization...");
@@ -52,7 +52,7 @@ export const DiceRoller: React.FC = () => {
       diceBoxRef.current = null;
     }
 
-    try {
+    try { // This is the try block that was missing its catch
       const config = {
         container: '#dice-box-container',
         assetPath: '/assets/dice-box/',
@@ -68,61 +68,95 @@ export const DiceRoller: React.FC = () => {
       console.log("Creating new DiceBox with config:", config);
       
       const newDiceBox = new DiceBox(config);
-diceBoxRef.current = newDiceBox;
+      diceBoxRef.current = newDiceBox;
 
-console.log("Initializing DiceBox...");
-newDiceBox.init()
-  .then(() => { // For successful init
-    console.log("DiceBox initialized successfully!");
-    
-    // The setTimeout for initial canvas check (though we'll modify its contents)
-    setTimeout(() => {
+      console.log("Initializing DiceBox...");
+      newDiceBox.init()
+        .then(() => { // For successful init
+          console.log("DiceBox initialized successfully!");
+          
+          setTimeout(() => {
+            if (diceContainerRef.current) {
+              const canvasEl = diceContainerRef.current.querySelector('canvas');
+              if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+                console.log(`DiceBox canvas (ID: ${canvasEl.id || 'none'}) found.`);
+                // NOTE: Direct canvas width/height manipulation was removed previously
+                // due to 'transferControlToOffscreen' errors.
+                // Ensure container is styled correctly via CSS.
+                canvasEl.style.width = '100%';
+                canvasEl.style.height = '100%';
+              } else {
+                console.warn("DiceBox canvas not found within #dice-box-container during initial check.");
+              }
+            }
+          }, 100);
+          
+          setIsDiceBoxReady(true);
+        })
+        .catch((initError) => { // Catch for init() errors
+          console.error("Failed to initialize DiceBox:", initError);
+          setIsDiceBoxReady(false);
+        });
+
+      // The handleResize definition and event listener setup are now OUTSIDE the inner try-catch for init,
+      // but still within the main useEffect callback, and importantly, AFTER the try-catch for DiceBox instantiation.
+      // This ensures they are set up if DiceBox instantiation itself doesn't throw an error.
+
+    } catch (creationError) { // This is the added catch for the outer try block
+      console.error("Error creating DiceBox instance:", creationError);
+      setIsDiceBoxReady(false);
+    }
+
+    // Setup handleResize listener
+    const handleResize = () => {
+      console.log("Window resize event triggered.");
       if (diceContainerRef.current) {
         const canvasEl = diceContainerRef.current.querySelector('canvas');
         if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-          console.log(`DiceBox canvas (ID: ${canvasEl.id || 'none'}) found.`);
-          // We will remove direct width/height setting here
-        } else {
-          console.warn("DiceBox canvas not found within #dice-box-container during initial check.");
+            // NOTE: Direct canvas width/height manipulation was removed previously.
+            // Re-apply styles if needed to ensure it fills the container after resize.
+            canvasEl.style.width = '100%';
+            canvasEl.style.height = '100%';
+            console.log(`DiceBox canvas styles re-applied. Container: ${diceContainerRef.current.clientWidth}x${diceContainerRef.current.clientHeight}`);
         }
       }
-    }, 100);
-    
-    setIsDiceBoxReady(true);
-  })
-  .catch((error) => { // Catch for init() errors
-    console.error("Failed to initialize DiceBox:", error);
-    setIsDiceBoxReady(false);
-  });
-
-// ... (rest of the try block and the catch for new DiceBox() errors) ...
-
-// Setup handleResize listener
-const handleResize = () => {
-  // We will modify this function too
-  console.log("Window resize event triggered.");
-  if (diceContainerRef.current) {
-    const canvasEl = diceContainerRef.current.querySelector('canvas');
-    if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-      // We will remove direct width/height setting here
-      console.log(`Resized DiceBox canvas to match container: ${diceContainerRef.current.clientWidth}x${diceContainerRef.current.clientHeight}`);
-    }
-  }
-};
-window.addEventListener('resize', handleResize);
-
-// Cleanup
-return () => {
-  window.removeEventListener('resize', handleResize);
-  if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') { // Or a destroy method if available
-      try {
-        diceBoxRef.current.clear(); // Or destroy()
-      } catch(e) {
-        console.warn("Error during DiceBox cleanup:", e);
-      }
-  }
-  diceBoxRef.current = null;
     };
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+        try {
+          diceBoxRef.current.clear();
+        } catch(e) {
+          console.warn("Error during DiceBox cleanup:", e);
+        }
+      }
+      diceBoxRef.current = null;
+    };
+  }, []);
+
+  // Load saved rolls from localStorage
+  useEffect(() => {
+    const savedRollsData = localStorage.getItem('savedRolls');
+    if (savedRollsData) {
+      try {
+        setSavedRolls(JSON.parse(savedRollsData));
+      } catch (e) { 
+        setSavedRolls([]);
+      }
+    } else {
+      const defaultRolls = [
+        { name: 'Attack Roll', dice: 1, diceType: 20, modifier: 5 },
+        { name: 'Damage (1d8+3)', dice: 1, diceType: 8, modifier: 3 },
+        { name: 'Fireball (8d6)', dice: 8, diceType: 6, modifier: 0 },
+        { name: 'Dagger Attack', dice: 1, diceType: 4, modifier: 3 },
+        { name: 'Greatsword (2d6+4)', dice: 2, diceType: 6, modifier: 4 },
+      ];
+      setSavedRolls(defaultRolls);
+      localStorage.setItem('savedRolls', JSON.stringify(defaultRolls));
+    }
   }, []);
 
   // Save rolls to localStorage when they change
@@ -156,33 +190,26 @@ return () => {
         notation = `${numDice}d${typeOfDice}`;
       }
 
-      // Clear any previous dice
       await diceBoxRef.current.clear();
-      
-      // Roll the dice and wait for results
       const rollResults = await diceBoxRef.current.roll(notation);
       
       if (currentAdvantage !== 'normal' && typeOfDice === 20) {
-        // Sort for advantage/disadvantage
         rollResults.sort((a, b) => 
           currentAdvantage === 'advantage' ? b.value - a.value : a.value - b.value
         );
         const chosenDie = rollResults[0];
         setTotal(chosenDie.value + currentModifier);
       } else {
-        // Sum the dice values
         const sumOfDice = rollResults.reduce((sum, die) => sum + die.value, 0);
         setTotal(sumOfDice + currentModifier);
       }
       
-      // Convert results to our format
       setDiceResults(rollResults.map((d, index) => ({ 
         type: d.sides, 
         value: d.value, 
         id: `${Date.now()}-${index}` 
       })));
       
-      // Finish rolling after a delay
       setTimeout(() => { 
         playSound('success'); 
         setIsRolling(false); 
@@ -227,7 +254,6 @@ return () => {
     rollDice(saved);
   };
 
-  // Common roll presets
   const commonRolls = [
     { name: 'Attack Roll', description: 'd20 + ability modifier + proficiency', dice: 1, diceType: 20, modifier: 5 },
     { name: 'Damage Roll', description: 'Weapon damage + ability modifier', dice: 1, diceType: 8, modifier: 3 },
