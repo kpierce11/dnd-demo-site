@@ -31,8 +31,7 @@ export const DiceRoller: React.FC = () => {
 	const [showSaveDialog, setShowSaveDialog] = useState(false);
 	const [advantage, setAdvantage] = useState<string>('normal');
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
-	const [showDice, setShowDice] = useState(false); // New state to control dice visibility
-
+	const [showDice, setShowDice] = useState(false);
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
@@ -42,12 +41,13 @@ export const DiceRoller: React.FC = () => {
 
 		if (diceBoxRef.current) {
 			try {
-				if (typeof diceBoxRef.current.clear === 'function') {
+				// Add check before calling clear
+				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 					diceBoxRef.current.clear();
 				}
-				if (typeof diceBoxRef.current.dispose === 'function') {
+				if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
 					diceBoxRef.current.dispose();
-				} else if (typeof diceBoxRef.current.destroy === 'function') {
+				} else if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
 					diceBoxRef.current.destroy();
 				}
 			} catch (e) {
@@ -97,7 +97,7 @@ export const DiceRoller: React.FC = () => {
 						diceCanvas.style.width = '100%';
 						diceCanvas.style.height = '100%';
 						diceCanvas.style.zIndex = '1000';
-						diceCanvas.style.pointerEvents = 'none'; // Initially no pointer events
+						diceCanvas.style.pointerEvents = 'none';
 
 						const windowWidth = window.innerWidth;
 						const windowHeight = window.innerHeight;
@@ -148,12 +148,13 @@ export const DiceRoller: React.FC = () => {
 			window.removeEventListener('resize', handleResize);
 			if (diceBoxRef.current) {
 				try {
-					if (typeof diceBoxRef.current.clear === 'function') {
+					// Add check before calling clear
+					if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 						diceBoxRef.current.clear();
 					}
-					if (typeof diceBoxRef.current.dispose === 'function') {
+					if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
 						diceBoxRef.current.dispose();
-					} else if (typeof diceBoxRef.current.destroy === 'function') {
+					} else if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
 						diceBoxRef.current.destroy();
 					}
 				} catch (e) {
@@ -161,7 +162,7 @@ export const DiceRoller: React.FC = () => {
 				}
 			}
 
-			const diceCanvas = document.getElementById(diceCanvasId);
+			const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
 			if (diceCanvas && diceCanvas.parentNode === document.body) {
 				console.log("Removing DiceBox canvas from body during cleanup:", diceCanvas);
 				document.body.removeChild(diceCanvas);
@@ -205,7 +206,7 @@ export const DiceRoller: React.FC = () => {
 			diceBoxRef.current.clear();
 			setDiceResults([]);
 			setTotal(null);
-			setShowDice(false); // Hide dice on overlay click
+			setShowDice(false);
 
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
@@ -224,7 +225,7 @@ export const DiceRoller: React.FC = () => {
 		setIsRolling(true);
 		setTotal(null);
 		setDiceResults([]);
-		setShowDice(true); // Show dice when rolling starts
+		setShowDice(true);
 		playSound('diceRoll');
 
 		const numDice = customRoll?.dice || numberOfDice;
@@ -297,18 +298,23 @@ export const DiceRoller: React.FC = () => {
                     if (diceCanvas) {
                         diceCanvas.style.pointerEvents = 'none';
                     }
+					// Explicitly clear dice from DiceBox after timeout
+					if (diceBoxRef.current) {
+						console.log("Clearing dice after timeout.");
+						diceBoxRef.current.clear();
+					}
                 }, 1000);
             };
 
 		} catch (error) {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
-            setShowDice(false); // Hide dice on error
+            setShowDice(false);
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
             }
-		}
+        }
 	};
 
 	const getResultsString = () => {
