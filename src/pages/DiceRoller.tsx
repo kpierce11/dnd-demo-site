@@ -36,7 +36,6 @@ export const DiceRoller: React.FC = () => {
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
-    // Removed diceCanvasRef as we will let DiceBox manage the canvas creation
 
 
 	useEffect(() => {
@@ -45,6 +44,7 @@ export const DiceRoller: React.FC = () => {
 		// Clean up previous DiceBox instance if it exists
 		if (diceBoxRef.current) {
 			try {
+				// Add check before calling clear
 				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 					diceBoxRef.current.clear();
 				}
@@ -62,7 +62,7 @@ export const DiceRoller: React.FC = () => {
 		const diceCanvasId = 'dice-box-fullscreen-canvas';
 
         // We are now relying on DiceBox configuration to create and manage the canvas in the body.
-        // We will not manually create or append the canvas element here.
+        // Manual canvas creation and appending is removed from this effect.
 
 
 		try {
@@ -97,8 +97,7 @@ export const DiceRoller: React.FC = () => {
                         // Initial pointer-events should be none when not rolling
                         diceCanvas.style.pointerEvents = 'none';
 
-                        // Setting attributes here again, although InvalidStateError suggests this might not work
-                        // if transferControlToOffscreen is used. Leaving for now to see behavior.
+                         // Set canvas resolution attributes after init
                         const windowWidth = window.innerWidth;
                         const windowHeight = window.innerHeight;
                         diceCanvas.width = windowWidth;
@@ -683,126 +682,4 @@ export const DiceRoller: React.FC = () => {
 						</ul>
 					</div>
 					<div>
-						<h3 className="font-bold text-accent">Attack Rolls</h3>
-						<p className="text-foreground/70 mb-2">d20 + ability modifier + proficiency bonus</p>
-						<ul className="list-disc pl-5 text-sm">
-							<li>Natural 20: Critical Hit (double damage dice)</li>
-							<li>Natural 1: Critical Miss</li>
-						</ul>
-					</div>
-				</div>
-			</motion.div>
-
-			<AnimatePresence>
-				{showSaveDialog && (
-					<motion.div
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						exit={{ opacity: 0 }}
-						className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-						onClick={() => setShowSaveDialog(false)}
-					>
-						<motion.div
-							initial={{ scale: 0.9 }}
-							animate={{ scale: 1 }}
-							exit={{ scale: 0.9 }}
-							className="magical-card p-6 max-w-md w-full"
-							onClick={(e) => e.stopPropagation()}
-						>
-							<h3 className="text-xl font-bold mb-4">Save Roll Configuration</h3>
-							<p className="mb-4 text-foreground/70">
-								Current: {numberOfDice}d{diceType}
-								{modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
-								{diceType === 20 && advantage !== 'normal' ?
-									` (${advantage === 'advantage' ? 'Advantage' : 'Disadvantage'})` : ''}
-							</p>
-
-							<div className="mb-4">
-								<label htmlFor="rollName" className="block mb-2">Roll Name:</label>
-								<input
-									id="rollName"
-									type="text"
-									className="w-full p-2 bg-muted text-foreground rounded-md"
-									value={newRollName}
-									onChange={(e) => setNewRollName(e.target.value)}
-									placeholder="e.g., Greatsword Attack"
-								/>
-							</div>
-
-							<div className="flex justify-end gap-3">
-								<button
-									className="bg-muted hover:bg-muted/70 text-foreground py-2 px-4 rounded-md"
-									onClick={() => setShowSaveDialog(false)}
-								>
-									Cancel
-								</button>
-								<button
-									className="bg-primary hover:bg-primary/80 text-white py-2 px-4 rounded-md"
-									onClick={handleSaveRoll}
-									disabled={!newRollName.trim()}
-								>
-									Save
-								</button>
-							</div>
-						</motion.div>
-					</motion.div>
-				)}
-			</AnimatePresence>
-
-			<motion.div
-				initial={{ opacity: 0, y: 20 }}
-				animate={{ opacity: 1, y: 0 }}
-				transition={{ duration: 0.5, delay: 0.2 }}
-				className="magical-card p-6"
-			>
-				<h2 className="text-xl font-bold mb-4">Common Dice Rolls</h2>
-
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-					{commonRolls.map((roll, index) => (
-						<div
-							key={index}
-							className="bg-muted/30 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-							onClick={() => handleUseSavedRoll(roll)}
-						>
-							<h3 className="font-bold text-accent mb-1">{roll.name}</h3>
-							<p className="text-sm text-foreground/70 mb-2">{roll.description}</p>
-							<div className="flex justify-between items-center">
-								<span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
-									{roll.dice}d{roll.diceType}
-									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
-								</span>
-								<button
-									tabIndex={-1}
-									className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md"
-								>
-									Roll
-								</button>
-							</div>
-						</div>
-					))}
-				</div>
-
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<h3 className="font-bold text-accent">Ability Checks & Saving Throws</h3>
-						<p className="text-foreground/70 mb-2">d20 + ability modifier (+ proficiency bonus if proficient)</p>
-						<ul className="list-disc pl-5 text-sm">
-							<li>Natural 20: Critical Success</li>
-							<li>Natural 1: Critical Miss</li>
-						</ul>
-					</div>
-					<div>
-						<h3 className="font-bold text-accent">Attack Rolls</h3>
-						<p className="text-foreground/70 mb-2">d20 + ability modifier + proficiency bonus</p>
-						<ul className="list-disc pl-5 text-sm">
-							<li>Natural 20: Critical Hit (double damage dice)</li>
-							<li>Natural 1: Critical Miss</li>
-						</ul>
-					</div>
-				</div>
-			</motion.div>
-		</div>
-	);
-};
-
-export default DiceRoller;
+						<h3 className="font-bold text-accent">Attack Rolls
