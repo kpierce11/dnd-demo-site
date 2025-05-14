@@ -83,20 +83,30 @@ export const DiceRoller: React.FC = () => {
       }
     }
 
-    return () => {
-      isEffectMounted = false;
-      console.log("DiceRoller: useEffect cleanup.");
-      const instanceToClean = diceBoxInstanceRef.current;
-      if (instanceToClean) {
-        console.log("Cleaning DiceBox instance.");
-        instanceToClean.clear?.();
-        // If DiceBox has a destroy method, call it here: instanceToClean.destroy?.();
-        // This would ideally remove its canvas.
-        // For now, we rely on React unmounting the container div.
+   return () => {
+  isEffectMounted = false; // From your current code, this is good
+  console.log("DiceRoller: useEffect cleanup. Current ref:", diceBoxInstanceRef.current);
+  const instanceToClean = diceBoxInstanceRef.current;
+
+  if (instanceToClean) {
+    console.log("Cleaning DiceBox instance: Attempting clear if function exists.");
+    if (instanceToClean.clear && typeof instanceToClean.clear === 'function') {
+      try {
+        instanceToClean.clear();
+        console.log("DiceBox instance .clear() called.");
+      } catch (e: any) {
+        // Log the error from clear() but don't let it stop the rest of the cleanup
+        console.warn("Error during instanceToClean.clear():", e.message);
       }
-      diceBoxInstanceRef.current = null;
-      setIsDiceBoxReady(false);
-    };
+    } else {
+      console.log("instanceToClean.clear was not a function or did not exist.");
+    }
+    // If DiceBox had a more specific destroy method, it would be called here.
+    // e.g., instanceToClean.destroy?.();
+  }
+  diceBoxInstanceRef.current = null;
+  setIsDiceBoxReady(false); // Always reset ready state on cleanup
+};
   }, []); // Empty dependency array for one-time setup
 
   useEffect(() => {
