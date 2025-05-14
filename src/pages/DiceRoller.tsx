@@ -33,6 +33,7 @@ export const DiceRoller: React.FC = () => {
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
 	const [showDice, setShowDice] = useState(false);
 
+
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
 
@@ -41,7 +42,6 @@ export const DiceRoller: React.FC = () => {
 
 		if (diceBoxRef.current) {
 			try {
-				// Add check before calling clear
 				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 					diceBoxRef.current.clear();
 				}
@@ -68,7 +68,7 @@ export const DiceRoller: React.FC = () => {
 				container: 'body',
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
-				scale: 10,
+				scale: 20,
 				gravity: 1,
 				throwForce: 6,
 				spinForce: 3,
@@ -99,13 +99,19 @@ export const DiceRoller: React.FC = () => {
 						diceCanvas.style.zIndex = '1000';
 						diceCanvas.style.pointerEvents = 'none';
 
+						// Set canvas resolution to match window size for clarity
+						diceCanvas.width = window.innerWidth;
+						diceCanvas.height = window.innerHeight;
+
 						const windowWidth = window.innerWidth;
 						const windowHeight = window.innerHeight;
 
 						if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 							console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+                            // Also call resize on init if available
+                             diceBoxRef.current.resize(windowWidth, windowHeight);
 						} else {
-							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
+							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and setting attributes.");
 						}
 
 					} else {
@@ -134,10 +140,16 @@ export const DiceRoller: React.FC = () => {
 				const windowWidth = window.innerWidth;
 				const windowHeight = window.innerHeight;
 
+				// Update canvas resolution on resize
+				diceCanvas.width = windowWidth;
+				diceCanvas.height = windowHeight;
+
+
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+                    diceBoxRef.current.resize(windowWidth, windowHeight);
 				} else {
-					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
+					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and setting attributes.");
 				}
 			}
 		};
@@ -148,7 +160,6 @@ export const DiceRoller: React.FC = () => {
 			window.removeEventListener('resize', handleResize);
 			if (diceBoxRef.current) {
 				try {
-					// Add check before calling clear
 					if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 						diceBoxRef.current.clear();
 					}
@@ -298,7 +309,6 @@ export const DiceRoller: React.FC = () => {
                     if (diceCanvas) {
                         diceCanvas.style.pointerEvents = 'none';
                     }
-					// Explicitly clear dice from DiceBox after timeout
 					if (diceBoxRef.current) {
 						console.log("Clearing dice after timeout.");
 						diceBoxRef.current.clear();
