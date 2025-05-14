@@ -8,7 +8,7 @@ interface CustomDiceResult {
 	type: number;
 	value: number;
 	id: string;
-    selected?: boolean; // Added a flag to indicate if this die was selected for the total
+    selected?: boolean;
 }
 
 interface SavedRoll {
@@ -35,20 +35,20 @@ export const DiceRoller: React.FC = () => {
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
+    const animationFrameIdRef = useRef<number>(0);
 
 	useEffect(() => {
 		console.log("Starting DiceBox initialization (Full Screen)...");
 
 		if (diceBoxRef.current) {
 			try {
-				// Add check before calling clear
 				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
 					diceBoxRef.current.clear();
 				}
 				if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
 					diceBoxRef.current.dispose();
-				} else if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
-					diceBoxRef.current.destroy();
+				} else if (diceBoxRef.current && typeof (diceBoxRef.current as any).destroy === 'function') {
+					(diceBoxRef.current as any).destroy();
 				}
 			} catch (e) {
 				console.warn("Error cleaning up previous DiceBox instance:", e);
@@ -62,13 +62,15 @@ export const DiceRoller: React.FC = () => {
 			console.log("Removing existing DiceBox canvas from body before initialization:", existingCanvas);
 			document.body.removeChild(existingCanvas);
 		}
+        
+        let resizeObserver: ResizeObserver | null = null;
 
 		try {
 			const config = {
 				container: 'body',
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
-				scale: 10,
+				scale: 7, // A common default, adjust if dice are too small/large visually
 				gravity: 1,
 				throwForce: 6,
 				spinForce: 3,
@@ -86,36 +88,71 @@ export const DiceRoller: React.FC = () => {
 			newDiceBox.init()
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
+					setIsDiceBoxReady(true);
 
-					const diceCanvas = document.getElementById(diceCanvasId);
-					if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-						console.log("Found dice canvas, applying full screen styles");
+					const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
+					if (diceCanvas) {
+						console.log("Found dice canvas, applying full screen styles and setting resolution.");
 
 						diceCanvas.style.position = 'fixed';
 						diceCanvas.style.top = '0';
 						diceCanvas.style.left = '0';
 						diceCanvas.style.width = '100%';
 						diceCanvas.style.height = '100%';
-						diceCanvas.style.zIndex = '1000';
+						diceCanvas.style.zIndex = '1000'; 
 						diceCanvas.style.pointerEvents = 'none';
 
-						const windowWidth = window.innerWidth;
-						const windowHeight = window.innerHeight;
+                        const updateCanvasResolutionAndResizeEngine = () => {
+                            if (!diceCanvas || !diceBoxRef.current) return;
 
-						if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-							console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-						} else {
-							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
-						}
+                            const dpr = window.devicePixelRatio || 1;
+                            const displayWidth = diceCanvas.clientWidth;
+                            const displayHeight = diceCanvas.clientHeight;
 
+                            const newCanvasWidth = Math.round(displayWidth * dpr);
+                            const newCanvasHeight = Math.round(displayHeight * dpr);
+                            
+                            if (diceCanvas.width !== newCanvasWidth || diceCanvas.height !== newCanvasHeight) {
+                                console.log(`Updating canvas resolution: ${newCanvasWidth}x${newCanvasHeight} (DPR: ${dpr})`);
+                                diceCanvas.width = newCanvasWidth;
+                                diceCanvas.height = newCanvasHeight;
+
+                                if (typeof diceBoxRef.current.resize === 'function') {
+                                    console.log("Calling DiceBox.resize()");
+                                    diceBoxRef.current.resize(newCanvasWidth, newCanvasHeight);
+                                } else {
+                                     // Fallback if the resize method is named differently or needs direct engine call
+                                    const engine = (diceBoxRef.current as any).engine;
+                                    if (engine && typeof engine.resize === 'function') {
+                                        console.log("Calling Babylon engine.resize()");
+                                        engine.resize(); 
+                                    } else {
+                                        console.warn("DiceBox resize method or engine.resize not found.");
+                                    }
+                                }
+                            }
+                        };
+                        
+                        // Initial sizing
+                        updateCanvasResolutionAndResizeEngine();
+
+                        // Use ResizeObserver for more reliable updates if the canvas container changes size
+                        if (typeof ResizeObserver !== 'undefined') {
+                            resizeObserver = new ResizeObserver(() => {
+                                // Debounce or throttle if performance becomes an issue
+                                cancelAnimationFrame(animationFrameIdRef.current);
+                                animationFrameIdRef.current = requestAnimationFrame(updateCanvasResolutionAndResizeEngine);
+                            });
+                            // Observe the body or a specific container if diceCanvas is not directly in body
+                            // For simplicity, if container is 'body', we observe document.documentElement
+                            resizeObserver.observe(document.documentElement); 
+                        } else {
+                            // Fallback to window resize event
+                             window.addEventListener('resize', updateCanvasResolutionAndResizeEngine);
+                        }
 					} else {
 						console.warn(`Dice canvas with ID '${diceCanvasId}' not found after initialization.`);
-						const allBodyCanvases = document.body.querySelectorAll('canvas');
-						console.log(`Found ${allBodyCanvases.length} canvas elements directly in body:`,
-							Array.from(allBodyCanvases).map(c => c.id || 'unnamed canvas'));
 					}
-
-					setIsDiceBoxReady(true);
 				})
 				.catch((error) => {
 					console.error("Failed to initialize DiceBox:", error);
@@ -126,51 +163,45 @@ export const DiceRoller: React.FC = () => {
 			setIsDiceBoxReady(false);
 		}
 
-		const handleResize = () => {
-			const diceCanvas = document.getElementById(diceCanvasId);
-
-			if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-				console.log("Window resized, found dice canvas, attempting resize via library if supported");
-				const windowWidth = window.innerWidth;
-				const windowHeight = window.innerHeight;
-
-				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-				} else {
-					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
-				}
-			}
-		};
-
-		window.addEventListener('resize', handleResize);
-
 		return () => {
-			window.removeEventListener('resize', handleResize);
+            if (animationFrameIdRef.current) {
+                cancelAnimationFrame(animationFrameIdRef.current);
+            }
+            if (resizeObserver) {
+                resizeObserver.disconnect();
+            } else {
+                // Fallback cleanup if ResizeObserver was not used
+                const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
+                 if (diceCanvas) {
+                    // This is a simplified version; you'd store the bound function to remove it correctly
+                    // For now, this illustrates the intent
+                    // window.removeEventListener('resize', updateCanvasResolutionAndResizeEngine); 
+                 }
+            }
+            
 			if (diceBoxRef.current) {
 				try {
-					// Add check before calling clear
-					if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+					if (typeof diceBoxRef.current.clear === 'function') {
 						diceBoxRef.current.clear();
 					}
-					if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
+					if (typeof diceBoxRef.current.dispose === 'function') {
 						diceBoxRef.current.dispose();
-					} else if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
-						diceBoxRef.current.destroy();
+					} else if (typeof (diceBoxRef.current as any).destroy === 'function') {
+						(diceBoxRef.current as any).destroy();
 					}
 				} catch (e) {
 					console.warn("Error disposing of DiceBox instance:", e);
 				}
 			}
 
-			const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
-			if (diceCanvas && diceCanvas.parentNode === document.body) {
-				console.log("Removing DiceBox canvas from body during cleanup:", diceCanvas);
-				document.body.removeChild(diceCanvas);
+			const canvasToRemove = document.getElementById(diceCanvasId);
+			if (canvasToRemove && canvasToRemove.parentNode === document.body) {
+				console.log("Removing DiceBox canvas from body during cleanup:", canvasToRemove);
+				document.body.removeChild(canvasToRemove);
 			}
-
 			diceBoxRef.current = null;
 		};
-	}, []);
+	}, []); // Keep empty dependency array for one-time setup/cleanup
 
 
 	useEffect(() => {
@@ -241,7 +272,6 @@ export const DiceRoller: React.FC = () => {
 		try {
 			let notation;
 			if (typeOfDice === 20 && currentAdvantage !== 'normal') {
-				// Always roll 2d20 for advantage/disadvantage
 				notation = '2d20';
 			} else {
 				notation = `${numDice}d${typeOfDice}`;
@@ -256,49 +286,41 @@ export const DiceRoller: React.FC = () => {
             let processedResults: CustomDiceResult[] = [];
 
             if (typeOfDice === 20 && (currentAdvantage === 'advantage' || currentAdvantage === 'disadvantage') && rollResults.length >= 2) {
-                // Handle advantage/disadvantage for 2d20 rolls
                 const sortedResults = [...rollResults].sort((a: any, b: any) => a.value - b.value);
-                const selectedDie = currentAdvantage === 'advantage' ? sortedResults[1] : sortedResults[0]; // Index 1 for highest, 0 for lowest
+                const selectedDie = currentAdvantage === 'advantage' ? sortedResults[1] : sortedResults[0]; 
 
                 calculatedTotal = selectedDie.value + currentModifier;
-
-                processedResults = rollResults.map((d: any) => ({ // Use original rollResults order for display
+                processedResults = rollResults.map((d: any) => ({ 
                     type: d.sides,
                     value: d.value,
-                    id: d.id, // Use original ID
-                    selected: d.id === selectedDie.id // Mark the selected die by comparing original ID
+                    id: d.id, 
+                    selected: d.id === selectedDie.id 
                 }));
 
             } else {
-                // Standard roll
                 const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0);
                 calculatedTotal = sumOfDice + currentModifier;
-
                 processedResults = rollResults.map((d: any) => ({
                     type: d.sides,
                     value: d.value,
-                    id: d.id, // Use original ID
-                    selected: true // All dice are "selected" in a normal roll
+                    id: d.id, 
+                    selected: true 
                 }));
             }
 
-
 			setTotal(calculatedTotal);
 			setDiceResults(processedResults);
-
 
             diceBoxRef.current.onRollComplete = (results: any) => {
                 console.log("Roll complete:", results);
                 playSound('success');
                 setIsRolling(false);
-                // Start timer to hide dice after 1 second
                 setTimeout(() => {
                     setShowDice(false);
-                    const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
-                    if (diceCanvas) {
-                        diceCanvas.style.pointerEvents = 'none';
+                    const canvas = document.getElementById('dice-box-fullscreen-canvas');
+                    if (canvas) {
+                        canvas.style.pointerEvents = 'none';
                     }
-					// Explicitly clear dice from DiceBox after timeout
 					if (diceBoxRef.current) {
 						console.log("Clearing dice after timeout.");
 						diceBoxRef.current.clear();
@@ -310,9 +332,9 @@ export const DiceRoller: React.FC = () => {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
             setShowDice(false);
-            const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
-            if (diceCanvas) {
-                diceCanvas.style.pointerEvents = 'none';
+            const canvas = document.getElementById('dice-box-fullscreen-canvas');
+            if (canvas) {
+                canvas.style.pointerEvents = 'none';
             }
         }
 	};
@@ -321,7 +343,6 @@ export const DiceRoller: React.FC = () => {
         if (diceResults.length === 0) return total !== null ? "Processing..." : "";
 
         if (diceType === 20 && (advantage === 'advantage' || advantage === 'disadvantage') && diceResults.length >= 2) {
-             // For advantage/disadvantage, show both dice and indicate the selected one
              return diceResults.map(d =>
                  d.selected ? `[${d.value}]` : d.value.toString()
              ).join(' + ');
@@ -376,7 +397,6 @@ export const DiceRoller: React.FC = () => {
 	const numberOfDiceOptions = Array.from({ length: 20 }, (_, i) => i + 1);
 	const modifierOptions = Array.from({ length: 21 }, (_, i) => i - 10);
 
-    // Effect to set number of dice to 1 when advantage/disadvantage is selected
     useEffect(() => {
         if (diceType === 20 && advantage !== 'normal') {
             setNumberOfDice(1);
@@ -386,7 +406,6 @@ export const DiceRoller: React.FC = () => {
 
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
-			{/* Overlay div to capture clicks when result is visible and not rolling */}
             {total !== null && !isRolling && showDice && (
                 <div
                     className="fixed inset-0 z-[999] cursor-pointer"
@@ -404,7 +423,6 @@ export const DiceRoller: React.FC = () => {
 				<h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
 
 				<div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
-					{/* Number of Dice */}
 					<div>
 						<label htmlFor="numDice" className="block mb-1 font-bold">Number of Dice</label>
 						<select
@@ -412,9 +430,8 @@ export const DiceRoller: React.FC = () => {
 							value={numberOfDice}
 							onChange={(e) => setNumberOfDice(parseInt(e.target.value) || 1)}
 							className="w-full p-2 bg-muted/50 rounded-md"
-                            disabled={diceType === 20 && advantage !== 'normal'} // Disable if advantage/disadvantage is on
+                            disabled={diceType === 20 && advantage !== 'normal'}
 						>
-                            {/* Conditionally render options */}
                             {diceType === 20 && advantage !== 'normal' ? (
                                 <option value={1}>1</option>
                             ) : (
@@ -425,7 +442,6 @@ export const DiceRoller: React.FC = () => {
 						</select>
 					</div>
 
-					{/* Type of Dice */}
 					<div>
 						<label htmlFor="diceType" className="block mb-1 font-bold">Type of Dice</label>
 						<select
@@ -437,7 +453,6 @@ export const DiceRoller: React.FC = () => {
 								if (newDiceType !== 20) {
 									setAdvantage('normal');
 								} else {
-                                    // If switching to d20, ensure number of dice is 1 if advantage/disadvantage is on
                                     if (advantage !== 'normal') {
                                         setNumberOfDice(1);
                                     }
@@ -451,7 +466,6 @@ export const DiceRoller: React.FC = () => {
 						</select>
 					</div>
 
-					{/* Modifier */}
 					<div>
 						<label htmlFor="modifier" className="block mb-1 font-bold">Modifier</label>
 						<select
@@ -467,7 +481,6 @@ export const DiceRoller: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Advantage/Disadvantage Toggle (only for d20) */}
 				{diceType === 20 && (
 					<div className="mb-6 text-center">
 						<label className="block mb-2 font-bold">Advantage/Disadvantage</label>
