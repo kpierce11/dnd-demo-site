@@ -494,7 +494,7 @@ export const DiceRoller: React.FC = () => {
 								</button>
 							</div>
 						</motion.div>
-					</motion.div> {/* Added missing closing tag */}
+					</motion.div>
 				)}
 			</AnimatePresence>
 
