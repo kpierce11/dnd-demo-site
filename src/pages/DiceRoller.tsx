@@ -53,7 +53,7 @@ export const DiceRoller: React.FC = () => {
   
   // Configure DiceBox with proper DOM reference
   const config = {
-    container: container, // Use actual DOM element instead of selector string
+    container: '#dice-box-container', // Use actual DOM element instead of selector string
     assetPath: '/public/assets/dice-box/', 
     scale: 30,
     throwForce: 6,
