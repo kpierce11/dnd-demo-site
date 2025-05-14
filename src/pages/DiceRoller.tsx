@@ -50,11 +50,11 @@ export const DiceRoller: React.FC = () => {
 
     // Configure DiceBox
     const diceBoxConfig = {
-      id: 'dice-box-container',  // Target div ID
+     container: '#dice-box-container', 
       assetPath: '/assets/dice-box/', // Path to 3D assets
       theme: 'default',
       offscreen: false,           // Make sure this is false to see the dice
-      scale: 6,                   // Adjust scale as needed
+      scale: 30,                   // Adjust scale as needed
       gravity: 1,
       throwForce: 10,
       spinForce: 5,
