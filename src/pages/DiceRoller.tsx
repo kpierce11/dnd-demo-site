@@ -99,6 +99,19 @@ export const DiceRoller: React.FC = () => {
       .then(() => {
         console.log("DiceBox initialized successfully!");
         setIsDiceBoxReady(true);
+         const canvas = container.querySelector('canvas');
+        if (canvas) {
+          canvas.style.width = "100%";
+          canvas.style.height = "100%";
+          canvas.style.position = "absolute";
+          canvas.style.top = "0";
+          canvas.style.left = "0";
+          canvas.width = container.clientWidth;
+          canvas.height = container.clientHeight;
+           console.log("Canvas positioned and sized:", canvas.width, "x", canvas.height);
+        } else {
+          console.warn("Canvas not found after initialization");
+        }
       })
       .catch((error) => {
         console.error("Failed to initialize DiceBox:", error);
@@ -109,13 +122,29 @@ export const DiceRoller: React.FC = () => {
     setIsDiceBoxReady(false);
   }
 
+    const handleResize = () => {
+    if (diceBoxRef.current && container) {
+      const canvas = container.querySelector('canvas');
+      if (canvas) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        console.log("Canvas resized to:", canvas.width, "x", canvas.height);
+      }
+    }
+  };
+
+    window.addEventListener('resize', handleResize);
+
   // Clean up on component unmount
   return () => {
+    window.removeEventListener('resize', handleResize);
     console.log("Component unmounting, cleaning up DiceBox...");
     if (diceBoxRef.current) {
       try {
-        // Just remove the reference - don't try to call any methods
-        console.log("Nulling out DiceBox reference");
+        // Only call clear if it exists
+        if (typeof diceBoxRef.current.clear === 'function') {
+          diceBoxRef.current.clear();
+        }
       } catch (e) {
         console.warn("Error during cleanup:", e);
       }
