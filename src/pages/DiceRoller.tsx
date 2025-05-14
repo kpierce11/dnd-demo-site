@@ -36,16 +36,19 @@ export const DiceRoller: React.FC = () => {
 
   useEffect(() => {
     let isEffectMounted = true;
-    
+    console.log("DiceRoller: useEffect for DiceBox - Entered.");
+
     if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
-      console.log("DiceRoller: Attempting DiceBox Initialization (Local Assets)...");
+      console.log("DiceRoller: Condition met - Creating and initializing DiceBox instance...");
       
       const box = new DiceBox({
-        container: diceContainerDivRef.current, // Pass the actual DOM element
+        container: diceContainerDivRef.current,
         assetPath: '/assets/dice-box/',
         theme: 'default',
         offscreen: true,
-        scale: 30, 
+        scale: 30,
+        gravity: 1, // You can experiment with these physics values later
+        throwForce: 5,
       });
       
       diceBoxInstanceRef.current = box; 
@@ -54,11 +57,11 @@ export const DiceRoller: React.FC = () => {
       box.init()
         .then(() => {
           if (isEffectMounted && diceBoxInstanceRef.current === box) { 
-            console.log("DiceBox Initialized with LOCAL assets!");
+            console.log("DiceBox Initialized with LOCAL assets! Hooray!");
             setIsDiceBoxReady(true);
-          } else if (isEffectMounted && diceBoxInstanceRef.current !== box) {
-            console.log("DiceBox init: instance mismatch, cleaning up orphaned instance.");
-            box.clear?.(); 
+          } else {
+             console.warn("DiceBox init completed, but instance mismatch or component unmounted. Orphaned instance clear attempted.");
+             box.clear?.();
           }
         })
         .catch(err => {
@@ -70,19 +73,29 @@ export const DiceRoller: React.FC = () => {
             setIsDiceBoxReady(false);
           }
         });
+    } else {
+      if (diceBoxInstanceRef.current) {
+        console.log("DiceRoller: useEffect - DiceBox instance already exists.");
+      }
+      if (!diceContainerDivRef.current) {
+        console.warn("DiceRoller: useEffect - diceContainerDivRef.current is null.");
+      }
     }
 
     return () => {
       isEffectMounted = false;
-      console.log("DiceRoller: useEffect cleanup.");
-      const instanceToClean = diceBoxInstanceRef.current;
-      if (instanceToClean) {
-        console.log("Cleaning DiceBox instance.");
-        instanceToClean.clear?.();
-        // Consider instanceToClean.destroy?.() if available & needed for full cleanup
+      console.log("DiceRoller: useEffect cleanup - Cleaning DiceBox instance if it exists.");
+      if (diceBoxInstanceRef.current) {
+        try {
+          diceBoxInstanceRef.current.clear?.(); 
+          console.log("DiceBox instance .clear() called in cleanup.");
+        } catch (e: any) {
+            console.warn("Error during diceBoxInstanceRef.current.clear() in cleanup:", e.message);
+        }
+        // Consider if a more thorough diceBoxInstanceRef.current.destroy?.() exists and is needed
+        diceBoxInstanceRef.current = null;
       }
-      diceBoxInstanceRef.current = null;
-      setIsDiceBoxReady(false);
+      setIsDiceBoxReady(false); 
     };
   }, []); 
 
@@ -110,7 +123,7 @@ export const DiceRoller: React.FC = () => {
 
   const rollDice = async (customRoll?: SavedRoll) => {
     if (!diceBoxInstanceRef.current || !isDiceBoxReady) {
-      console.warn("DiceBox not ready.");
+      console.warn("DiceBox not ready for roll.");
       return;
     }
     setIsRolling(true);
