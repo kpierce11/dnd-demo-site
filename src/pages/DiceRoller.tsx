@@ -15,7 +15,7 @@ interface SavedRoll {
 	dice: number;
 	diceType: number;
 	modifier: number;
-	advantage?: string; // Added advantage/disadvantage to saved rolls
+	advantage?: string;
 }
 
 export const DiceRoller: React.FC = () => {
@@ -30,7 +30,6 @@ export const DiceRoller: React.FC = () => {
 	const [showSaveDialog, setShowSaveDialog] = useState(false);
 	const [advantage, setAdvantage] = useState<string>('normal');
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
-	const [isResultVisible, setIsResultVisible] = useState(false); // State to control result visibility
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
@@ -94,10 +93,10 @@ export const DiceRoller: React.FC = () => {
 							diceCanvas.style.position = 'fixed';
 							diceCanvas.style.top = '0';
 							diceCanvas.style.left = '0';
-							diceCanvas.style.width = '100%';
-							diceCanvas.style.height = '100%';
-							diceCanvas.style.zIndex = '1000'; // Set a high z-index to appear in front
-							diceCanvas.style.pointerEvents = 'none';
+							canvas.style.width = '100%'; // Ensure canvas fills the screen
+							canvas.style.height = '100%'; // Ensure canvas fills the screen
+							diceCanvas.style.zIndex = '1000';
+							diceCanvas.style.pointerEvents = 'none'; // Initially no pointer events
 
 							const windowWidth = window.innerWidth;
 							const windowHeight = window.innerHeight;
@@ -182,7 +181,7 @@ export const DiceRoller: React.FC = () => {
 				setSavedRolls([]);
 			}
 		} else {
-			const defaultRolls: SavedRoll[] = [ // Explicitly type defaultRolls
+			const defaultRolls: SavedRoll[] = [
 				{ name: 'Attack Roll', dice: 1, diceType: 20, modifier: 5 },
 				{ name: 'Damage (1d8+3)', dice: 1, diceType: 8, modifier: 3 },
 				{ name: 'Fireball (8d6)', dice: 8, diceType: 6, modifier: 0 },
@@ -200,23 +199,19 @@ export const DiceRoller: React.FC = () => {
 		}
 	}, [savedRolls]);
 
-	// Add click listener to clear dice when result is visible
-	useEffect(() => {
-		const handleDocumentClick = () => {
-			if (isResultVisible && diceBoxRef.current) {
-				diceBoxRef.current.clear();
-				setDiceResults([]);
-				setTotal(null);
-				setIsResultVisible(false);
-			}
-		};
-
-		document.addEventListener('click', handleDocumentClick);
-
-		return () => {
-			document.removeEventListener('click', handleDocumentClick);
-		};
-	}, [isResultVisible]);
+	const handleCanvasClick = () => {
+		if (diceBoxRef.current && !isRolling) {
+            console.log("Canvas clicked, attempting to clear dice.");
+			diceBoxRef.current.clear();
+			setDiceResults([]);
+			setTotal(null);
+            // Temporarily enable pointer events for the canvas during rolling
+            const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+            if (diceCanvas) {
+                diceCanvas.style.pointerEvents = 'none';
+            }
+		}
+	};
 
 
 	const rollDice = async (customRoll?: SavedRoll) => {
@@ -228,13 +223,19 @@ export const DiceRoller: React.FC = () => {
 		setIsRolling(true);
 		setTotal(null);
 		setDiceResults([]);
-		setIsResultVisible(false); // Hide previous result on new roll
 		playSound('diceRoll');
 
 		const numDice = customRoll?.dice || numberOfDice;
 		const typeOfDice = customRoll?.diceType || diceType;
 		const currentModifier = customRoll?.modifier || modifier;
-		const currentAdvantage = customRoll?.advantage || advantage; // Use custom roll advantage if available
+		const currentAdvantage = customRoll?.advantage || advantage;
+
+        // Temporarily enable pointer events for the canvas during rolling
+        const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+        if (diceCanvas) {
+            diceCanvas.style.pointerEvents = 'auto';
+        }
+
 
 		try {
 			let notation;
@@ -249,7 +250,7 @@ export const DiceRoller: React.FC = () => {
 			const rollResults = await diceBoxRef.current.roll(notation);
 			console.log("Roll results from DiceBox:", rollResults);
 
-			const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0); // Explicitly type sum
+			const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0);
 			setTotal(sumOfDice + currentModifier);
 
 
@@ -259,16 +260,23 @@ export const DiceRoller: React.FC = () => {
 				id: `${Date.now()}-${index}`
 			})));
 
-			setTimeout(() => {
-				playSound('success');
-				setIsRolling(false);
-				setIsResultVisible(true); // Show result after rolling animation
-			}, 1500);
+            // Add a listener to the DiceBox itself to detect when rolling stops
+            diceBoxRef.current.onRollComplete = (results: any) => {
+                console.log("Roll complete:", results);
+                playSound('success');
+                setIsRolling(false);
+                // The canvas pointerEvents are already 'auto' at this point,
+                // allowing the handleCanvasClick to fire on the next click.
+            };
 
 		} catch (error) {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
-			setIsResultVisible(false);
+             // Ensure pointer events are disabled if rolling fails
+            const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+            if (diceCanvas) {
+                diceCanvas.style.pointerEvents = 'none';
+            }
 		}
 	};
 
@@ -284,7 +292,7 @@ export const DiceRoller: React.FC = () => {
 				dice: numberOfDice,
 				diceType: diceType,
 				modifier: modifier,
-				advantage: diceType === 20 ? advantage : undefined, // Save advantage only for d20
+				advantage: diceType === 20 ? advantage : undefined,
 			};
 			setSavedRolls(prevRolls => [...prevRolls, newRoll]);
 			setNewRollName('');
@@ -310,19 +318,30 @@ export const DiceRoller: React.FC = () => {
 		rollDice(saved);
 	};
 
-	const commonRolls: SavedRoll[] = [ // Explicitly type commonRolls
+	const commonRolls: SavedRoll[] = [
 		{ name: 'Attack Roll', description: 'd20 + ability modifier + proficiency', dice: 1, diceType: 20, modifier: 5 },
-		{ name: 'Damage Roll', description: 'Weapon damage + ability modifier', dice: 1, diceType: 8, modifier: 3 },
+		{ name: 'Damage (1d8+3)', description: 'Weapon damage + ability modifier', dice: 1, diceType: 8, modifier: 3 },
 		{ name: 'Ability Check', description: 'd20 + ability modifier', dice: 1, diceType: 20, modifier: 2 },
 		{ name: 'Saving Throw', description: 'd20 + saving throw modifier', dice: 1, diceType: 20, modifier: 1 },
-		{ name: 'Fireball', description: '8d6 fire damage (Dex save for half)', dice: 8, diceType: 6, modifier: 0 },
+		{ name: 'Fireball (8d6)', dice: 8, diceType: 6, modifier: 0 },
 		{ name: 'Sneak Attack (3rd level)', description: '2d6 extra damage', dice: 2, diceType: 6, modifier: 0 }
 	];
 
 	const diceTypes = [4, 6, 8, 10, 12, 20, 100];
+	const numberOfDiceOptions = Array.from({ length: 20 }, (_, i) => i + 1);
+	const modifierOptions = Array.from({ length: 21 }, (_, i) => i - 10); // Modifiers from -10 to +10
 
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
+			{/* Overlay div to capture clicks when result is visible */}
+            {total !== null && !isRolling && (
+                <div
+                    className="fixed inset-0 z-[999] cursor-pointer" // Z-index lower than canvas (1000) but higher than content (z-20)
+                    onClick={handleCanvasClick}
+					aria-hidden="true" // Hide from screen readers as it's purely for click handling
+                ></div>
+            )}
+
 			<motion.div
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
@@ -334,16 +353,17 @@ export const DiceRoller: React.FC = () => {
 				<div className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
 					{/* Number of Dice */}
 					<div>
-						<label htmlFor="numDice" className="block mb-1 font-bold">Number of Dice (1-20)</label>
-						<input
+						<label htmlFor="numDice" className="block mb-1 font-bold">Number of Dice</label>
+						<select
 							id="numDice"
-							type="number"
-							min="1"
-							max="20"
 							value={numberOfDice}
-							onChange={(e) => setNumberOfDice(Math.min(20, Math.max(1, parseInt(e.target.value) || 1)))}
-							className="w-full p-2 bg-muted/50 rounded-md text-center"
-						/>
+							onChange={(e) => setNumberOfDice(parseInt(e.target.value) || 1)}
+							className="w-full p-2 bg-muted/50 rounded-md"
+						>
+							{numberOfDiceOptions.map(num => (
+								<option key={num} value={num}>{num}</option>
+							))}
+						</select>
 					</div>
 
 					{/* Type of Dice */}
@@ -356,7 +376,7 @@ export const DiceRoller: React.FC = () => {
 								const newDiceType = parseInt(e.target.value);
 								setDiceType(newDiceType);
 								if (newDiceType !== 20) {
-									setAdvantage('normal'); // Reset advantage if not d20
+									setAdvantage('normal');
 								}
 							}}
 							className="w-full p-2 bg-muted/50 rounded-md"
@@ -370,13 +390,16 @@ export const DiceRoller: React.FC = () => {
 					{/* Modifier */}
 					<div>
 						<label htmlFor="modifier" className="block mb-1 font-bold">Modifier</label>
-						<input
+						<select
 							id="modifier"
-							type="number"
 							value={modifier}
 							onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
-							className="w-full p-2 bg-muted/50 rounded-md text-center"
-						/>
+							className="w-full p-2 bg-muted/50 rounded-md"
+						>
+							{modifierOptions.map(mod => (
+								<option key={mod} value={mod}>{mod > 0 ? `+${mod}` : mod}</option>
+							))}
+						</select>
 					</div>
 				</div>
 
@@ -386,19 +409,19 @@ export const DiceRoller: React.FC = () => {
 						<label className="block mb-2 font-bold">Advantage/Disadvantage</label>
 						<div className="inline-flex rounded-md shadow-sm">
 							<button
-								className={`py-2 px-4 rounded-l-lg ${advantage === 'advantage' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
+								className={`py-2 px-4 rounded-l-lg transition-colors ${advantage === 'advantage' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
 								onClick={() => setAdvantage('advantage')}
 							>
 								Advantage
 							</button>
 							<button
-								className={`py-2 px-4 ${advantage === 'normal' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
+								className={`py-2 px-4 transition-colors ${advantage === 'normal' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
 								onClick={() => setAdvantage('normal')}
 							>
 								Normal
 							</button>
 							<button
-								className={`py-2 px-4 rounded-r-lg ${advantage === 'disadvantage' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
+								className={`py-2 px-4 rounded-r-lg transition-colors ${advantage === 'disadvantage' ? 'bg-accent text-white' : 'bg-muted/50 hover:bg-muted/70'}`}
 								onClick={() => setAdvantage('disadvantage')}
 							>
 								Disadvantage
@@ -443,7 +466,7 @@ export const DiceRoller: React.FC = () => {
 						<p className="text-xl">
 							Result: <span className="font-bold text-3xl text-accent glow-text">{total}</span>
 						</p>
-						{diceResults.length > 0 && ( // Only show individual dice results if available
+						{diceResults.length > 0 && (
 							<p className="text-foreground/70 text-sm">
 								({getResultsString()})
 								{modifier !== 0 ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : ''}
