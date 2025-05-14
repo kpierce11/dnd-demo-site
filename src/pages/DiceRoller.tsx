@@ -493,7 +493,7 @@ export const DiceRoller: React.FC = () => {
                 </button>
               </div>
             </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
