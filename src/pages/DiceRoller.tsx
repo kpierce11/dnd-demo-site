@@ -49,7 +49,7 @@ export const DiceRoller: React.FC = () => {
     }
 
     // Configure DiceBox
-    const diceBoxConfig = {
+    const config = {
      container: '#dice-box-container', 
       assetPath: '/assets/dice-box/', // Path to 3D assets
       theme: 'default',
@@ -63,7 +63,7 @@ export const DiceRoller: React.FC = () => {
     };
 
     // Create and initialize new DiceBox instance
-    const newDiceBox = new DiceBox(diceBoxConfig);
+    const newDiceBox = new DiceBox(config);
     diceBoxRef.current = newDiceBox;
     
     // Initialize DiceBox
