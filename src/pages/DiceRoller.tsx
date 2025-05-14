@@ -81,7 +81,11 @@ export const DiceRoller: React.FC = () => {
     return () => {
       if (diceBoxRef.current) {
         try {
-          diceBoxRef.current.clear();
+         if (typeof diceBoxRef.current.clear === 'function') {
+           diceBoxRef.current.clear();
+         } else if (typeof diceBoxRef.current.dispose === 'function') {
+           diceBoxRef.current.dispose();
+         }
         } catch (e) {
           console.warn("Error during cleanup:", e);
         }
