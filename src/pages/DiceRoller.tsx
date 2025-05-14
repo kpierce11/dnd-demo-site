@@ -36,21 +36,19 @@ export const DiceRoller: React.FC = () => {
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
     const animationFrameIdRef = useRef<number>(0);
-    // Store the resize handler function in a ref to ensure `removeEventListener` uses the same function instance
-    const resizeHandlerRef = useRef<() => void | null>(null);
+    const resizeHandlerRef = useRef<(() => void) | null>(null);
 
 
 	useEffect(() => {
 		console.log("Starting DiceBox initialization (Full Screen)...");
 
+		// Cleanup previous instance if any
 		if (diceBoxRef.current) {
 			try {
-				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
-					diceBoxRef.current.clear();
-				}
-				if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
+				if (typeof diceBoxRef.current.clear === 'function') diceBoxRef.current.clear();
+				if (typeof diceBoxRef.current.dispose === 'function') {
 					diceBoxRef.current.dispose();
-				} else if (diceBoxRef.current && typeof (diceBoxRef.current as any).destroy === 'function') {
+				} else if (typeof (diceBoxRef.current as any).destroy === 'function') {
 					(diceBoxRef.current as any).destroy();
 				}
 			} catch (e) {
@@ -62,7 +60,6 @@ export const DiceRoller: React.FC = () => {
 		const diceCanvasId = 'dice-box-fullscreen-canvas';
 		const existingCanvas = document.getElementById(diceCanvasId);
 		if (existingCanvas && existingCanvas.parentNode === document.body) {
-			console.log("Removing existing DiceBox canvas from body before initialization:", existingCanvas);
 			document.body.removeChild(existingCanvas);
 		}
         
@@ -73,17 +70,20 @@ export const DiceRoller: React.FC = () => {
 				container: 'body',
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
-				scale: 7, 
+				scale: 7, // Visual scale of dice models
 				gravity: 1,
 				throwForce: 6,
 				spinForce: 3,
 				lightIntensity: 0.8,
 				shadowTransparency: 0.8,
 				id: diceCanvasId,
+                engineOptions: { // Pass engine options to Babylon.js
+                    antialias: true,
+                    adaptToDeviceRatio: true, // Key option for sharpness
+                }
 			};
 
 			console.log("Creating new DiceBox with config:", config);
-
 			const newDiceBox = new DiceBox(config);
 			diceBoxRef.current = newDiceBox;
 
@@ -95,52 +95,43 @@ export const DiceRoller: React.FC = () => {
 
 					const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
 					if (diceCanvas) {
-						console.log("Found dice canvas, applying full screen styles and setting resolution via DiceBox.resize().");
+						console.log("Found dice canvas. Applying styles and setting up resize handling.");
 
 						diceCanvas.style.position = 'fixed';
 						diceCanvas.style.top = '0';
 						diceCanvas.style.left = '0';
-						diceCanvas.style.width = '100%';
-						diceCanvas.style.height = '100%';
+						diceCanvas.style.width = '100%'; // CSS display width
+						diceCanvas.style.height = '100%'; // CSS display height
 						diceCanvas.style.zIndex = '1000'; 
 						diceCanvas.style.pointerEvents = 'none';
 
-                        const updateEngineResolution = () => {
-                            if (!diceCanvas || !diceBoxRef.current || !diceBoxRef.current.iframe) return;
+                        const updateDiceBoxEngineSize = () => {
+                            if (!diceCanvas || !diceBoxRef.current) return;
 
-                            // Get display size of the iframe (which contains the actual rendering canvas)
-                            // Or, if DiceBox directly provides the canvas, use that.
-                            // The key is to get the element whose clientWidth/Height reflects the display size.
-                            // Since the canvas with diceCanvasId is styled to 100%, its clientWidth/Height should be correct.
-                            const displayWidth = diceCanvas.clientWidth;
-                            const displayHeight = diceCanvas.clientHeight;
+                            const displayWidth = diceCanvas.clientWidth;  // Current CSS display width
+                            const displayHeight = diceCanvas.clientHeight; // Current CSS display height
                             
-                            const dpr = window.devicePixelRatio || 1;
-                            const renderWidth = Math.round(displayWidth * dpr);
-                            const renderHeight = Math.round(displayHeight * dpr);
-                            
-                            // We DO NOT set diceCanvas.width/height directly due to OffscreenCanvas
-                            // We rely on DiceBox's resize method.
+                            // With adaptToDeviceRatio: true, DiceBox/Babylon should handle DPR internally.
+                            // We pass the CSS display dimensions to its resize method.
                             if (typeof diceBoxRef.current.resize === 'function') {
-                                console.log(`Calling DiceBox.resize(${renderWidth}, ${renderHeight}) (DPR: ${dpr})`);
-                                diceBoxRef.current.resize(renderWidth, renderHeight);
+                                console.log(`Calling DiceBox.resize(${displayWidth}, ${displayHeight}) - Engine should adapt DPR.`);
+                                diceBoxRef.current.resize(displayWidth, displayHeight);
                             } else {
                                 console.warn("DiceBox resize method not found. Canvas might not resize correctly.");
                             }
                         };
                         
-                        // Store the handler in the ref
                         resizeHandlerRef.current = () => {
                             cancelAnimationFrame(animationFrameIdRef.current);
-                            animationFrameIdRef.current = requestAnimationFrame(updateEngineResolution);
+                            animationFrameIdRef.current = requestAnimationFrame(updateDiceBoxEngineSize);
                         };
                         
-                        // Initial sizing
-                        // Wait a brief moment for layout to stabilize before initial resize
-                        requestAnimationFrame(updateEngineResolution);
+                        // Initial sizing after layout
+                        requestAnimationFrame(updateDiceBoxEngineSize);
 
                         if (typeof ResizeObserver !== 'undefined') {
                             resizeObserver = new ResizeObserver(resizeHandlerRef.current);
+                            // Observe a stable parent or the body if canvas is fullscreen
                             resizeObserver.observe(document.documentElement); 
                         } else {
                              window.addEventListener('resize', resizeHandlerRef.current);
@@ -164,10 +155,10 @@ export const DiceRoller: React.FC = () => {
             }
             if (resizeObserver) {
                 resizeObserver.disconnect();
-            } else if (resizeHandlerRef.current) {
+            } else if (resizeHandlerRef.current) { // Check if ref.current exists
                  window.removeEventListener('resize', resizeHandlerRef.current);
             }
-            resizeHandlerRef.current = null; // Clear the ref
+            resizeHandlerRef.current = null;
             
 			if (diceBoxRef.current) {
 				try {
@@ -186,7 +177,6 @@ export const DiceRoller: React.FC = () => {
 
 			const canvasToRemove = document.getElementById(diceCanvasId);
 			if (canvasToRemove && canvasToRemove.parentNode === document.body) {
-				console.log("Removing DiceBox canvas from body during cleanup:", canvasToRemove);
 				document.body.removeChild(canvasToRemove);
 			}
 			diceBoxRef.current = null;
