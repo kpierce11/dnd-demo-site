@@ -29,14 +29,14 @@ export const DiceRoller: React.FC = () => {
 	const [showSaveDialog, setShowSaveDialog] = useState(false);
 	const [advantage, setAdvantage] = useState<string>('normal');
 	const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
+    const [areDiceVisible, setAreDiceVisible] = useState(false); // State to track if dice are expected to be visible
+
 
 	const { playSound } = useAudio();
-	// Removed diceContainerRef as we'll use document.body directly for the canvas container
+	// Removed diceContainerRef as we're using document.body directly for the canvas container
 	const diceBoxRef = useRef<DiceBox | null>(null);
 
 	useEffect(() => {
-		// No need to check a specific container ref here, as we're targeting the body
-
 		console.log("Starting DiceBox initialization (Full Screen)...");
 
 		// Clean up any existing instance on effect re-run or component unmount
@@ -45,7 +45,6 @@ export const DiceRoller: React.FC = () => {
 				if (typeof diceBoxRef.current.clear === 'function') {
 					diceBoxRef.current.clear();
 				}
-				// Attempt more robust cleanup if DiceBox API provides it
 				if (typeof diceBoxRef.current.dispose === 'function') {
 					diceBoxRef.current.dispose();
 				} else if (typeof diceBoxRef.current.destroy === 'function') {
@@ -72,7 +71,6 @@ export const DiceRoller: React.FC = () => {
 				container: 'body', // Target the body for full screen
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
-				// Add other configurations as needed
 				scale: 20,
 				gravity: 1,
 				throwForce: 6,
@@ -105,18 +103,14 @@ export const DiceRoller: React.FC = () => {
 							diceCanvas.style.left = '0';
 							diceCanvas.style.width = '100%';
 							diceCanvas.style.height = '100%';
-							diceCanvas.style.zIndex = '-1'; // Position behind other content
-							diceCanvas.style.pointerEvents = 'none'; // Allow interaction with elements above
-
-							// No need to explicitly resize canvas width/height attributes if relying on CSS and library adapts
+							diceCanvas.style.zIndex = '100'; // Set a high z-index to roll on top
+							diceCanvas.style.pointerEvents = 'none'; // Initially none, will enable when dice are visible
 
 							// Get current window dimensions to potentially inform the library
 							const windowWidth = window.innerWidth;
 							const windowHeight = window.innerHeight;
 
 							// *** Attempt to resize via DiceBox API (using window dimensions) ***
-							// The console output indicates this method is not found or supported in this version.
-							// We rely on CSS for sizing and the library's potential internal handling.
 							if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 								console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
 								// diceBoxRef.current.resize(windowWidth, windowHeight); // Method not found - comment out or remove call
@@ -126,7 +120,6 @@ export const DiceRoller: React.FC = () => {
 
 						} else {
 							console.warn(`Dice canvas with ID '${diceCanvasId}' not found after initialization.`);
-							// Fallback to checking all canvases in body if the specific ID wasn't found
 							const allBodyCanvases = document.body.querySelectorAll('canvas');
 							console.log(`Found ${allBodyCanvases.length} canvas elements directly in body:`,
 								Array.from(allBodyCanvases).map(c => c.id || 'unnamed canvas'));
@@ -144,31 +137,55 @@ export const DiceRoller: React.FC = () => {
 			setIsDiceBoxReady(false);
 		}
 
-		const handleResize = () => {
-			// Find the canvas element created by DiceBox using its specific ID
-			const diceCanvas = document.getElementById(diceCanvasId);
+        const handleResize = () => {
+            const diceCanvas = document.getElementById(diceCanvasId);
+            if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
+                console.log("Window resized, found dice canvas, attempting resize via library if supported");
+                const windowWidth = window.innerWidth;
+                const windowHeight = window.innerHeight;
 
-			if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-				console.log("Window resized, found dice canvas, attempting resize via library if supported");
-				const windowWidth = window.innerWidth;
-				const windowHeight = window.innerHeight;
+                if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+                    console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+                    // diceBoxRef.current.resize(windowWidth, windowHeight); // Method not found
+                } else {
+                    console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
+                }
+            }
+        };
 
-				// *** Attempt to resize via DiceBox API on window resize (using window dimensions) ***
-				// The console output indicates this method is not found or supported in this version.
-				// We rely on CSS for sizing and the library's potential internal handling.
-				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-					// diceBoxRef.current.resize(windowWidth, windowHeight); // Method not found - comment out or remove call
-				} else {
-					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
-				}
-			}
-		};
+        // Function to clear dice on click
+        const handleCanvasClick = () => {
+            if (diceBoxRef.current && areDiceVisible) {
+                 console.log("Canvas clicked, clearing dice.");
+                 diceBoxRef.current.clear();
+                 setDiceResults([]); // Clear results state
+                 setTotal(null); // Clear total state
+                 setAreDiceVisible(false); // Hide dice visual cues
+                 // Re-enable pointer events on UI elements by making canvas non-interactive
+                 const diceCanvas = document.getElementById(diceCanvasId);
+                 if(diceCanvas instanceof HTMLCanvasElement) {
+                     diceCanvas.style.pointerEvents = 'none';
+                 }
+            }
+        };
 
-		window.addEventListener('resize', handleResize);
+        window.addEventListener('resize', handleResize);
+        // Add click listener to the body or canvas
+        document.body.addEventListener('click', handleCanvasClick);
+        // Alternatively, add listener to the canvas itself if pointer-events are enabled when dice are visible
+        // const diceCanvas = document.getElementById(diceCanvasId);
+        // if (diceCanvas) {
+        //    diceCanvas.addEventListener('click', handleCanvasClick);
+        // }
+
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
+            document.body.removeEventListener('click', handleCanvasClick); // Remove click listener
+            // if (diceCanvas) { // If canvas listener was added
+            //    diceCanvas.removeEventListener('click', handleCanvasClick);
+            // }
+
 			if (diceBoxRef.current) {
 				try {
 					if (typeof diceBoxRef.current.clear === 'function') {
@@ -193,9 +210,30 @@ export const DiceRoller: React.FC = () => {
 
 			diceBoxRef.current = null;
 		};
-	}, []); // Empty dependency array means this effect runs only on mount and unmount
+	}, [areDiceVisible]); // Added areDiceVisible to dependencies to update click logic
 
 
+    // Update areDiceVisible state when dice results change and not rolling
+    useEffect(() => {
+        if (diceResults.length > 0 && !isRolling) {
+            setAreDiceVisible(true);
+            // Enable pointer events on the canvas when dice are visible so clicks are captured
+             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+             if(diceCanvas instanceof HTMLCanvasElement) {
+                 diceCanvas.style.pointerEvents = 'auto';
+             }
+        } else if (!isRolling && diceResults.length === 0) {
+            setAreDiceVisible(false);
+             // Disable pointer events when no dice are visible
+             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
+             if(diceCanvas instanceof HTMLCanvasElement) {
+                 diceCanvas.style.pointerEvents = 'none';
+             }
+        }
+    }, [diceResults, isRolling]);
+
+
+	// Load saved rolls from localStorage
 	useEffect(() => {
 		const savedRollsData = localStorage.getItem('savedRolls');
 		if (savedRollsData) {
@@ -233,6 +271,7 @@ export const DiceRoller: React.FC = () => {
 		setTotal(null);
 		setDiceResults([]);
 		playSound('diceRoll');
+        setAreDiceVisible(true); // Indicate dice are expected
 
 		const numDice = customRoll?.dice || numberOfDice;
 		const typeOfDice = customRoll?.diceType || diceType;
@@ -277,6 +316,7 @@ export const DiceRoller: React.FC = () => {
 		} catch (error) {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
+            setAreDiceVisible(false); // Hide dice visual cues on error
 		}
 	};
 
@@ -325,7 +365,7 @@ export const DiceRoller: React.FC = () => {
 	return (
 		// The main container for DiceRoller content - will be overlaid on the full-screen canvas
 		// Position relative and z-index higher than canvas (z-index: -1)
-		<div className="max-w-6xl mx-auto relative z-20">
+		<div className="max-w-6xl mx-auto relative z-20"> {/* Added relative z-20 */}
 			<motion.div
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
