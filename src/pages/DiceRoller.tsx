@@ -30,84 +30,61 @@ export const DiceRoller: React.FC = () => {
   const [advantage, setAdvantage] = useState<string>('normal');
 
   const { playSound } = useAudio();
-  const diceContainerRef = useRef<HTMLDivElement>(null);
+  const diceContainerDivRef = useRef<HTMLDivElement>(null);
   const diceBoxInstanceRef = useRef<DiceBox | null>(null);
   const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
 
   useEffect(() => {
     let isEffectMounted = true;
-    let boxInstance: DiceBox | null = null;
-
-    if (document.getElementById("dice-box-container") && !diceBoxInstanceRef.current) {
+    
+    if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
       console.log("DiceRoller: Attempting DiceBox Initialization (Local Assets)...");
       
-      const config = {
-        container: "#dice-box-container",
+      const box = new DiceBox({
+        container: diceContainerDivRef.current, // Pass the actual DOM element
         assetPath: '/assets/dice-box/',
         theme: 'default',
         offscreen: true,
-        scale: 30, // Current scale preference
-        // To help with the 300x150 issue, ensure container has explicit size
-        // or try passing width/height if library supports it (not in basic config)
-      };
+        scale: 30, 
+      });
+      
+      diceBoxInstanceRef.current = box; 
+      setIsDiceBoxReady(false);       
 
-      try {
-        boxInstance = new DiceBox(config);
-        diceBoxInstanceRef.current = boxInstance; // Set ref early
-        setIsDiceBoxReady(false);
-
-        boxInstance.init()
-          .then(() => {
-            if (isEffectMounted && diceBoxInstanceRef.current === boxInstance) {
-              console.log("DiceBox Initialized with LOCAL assets!");
-              setIsDiceBoxReady(true);
-              // Attempt to trigger a resize or update if dice are small/offset
-              // This depends on DiceBox API, e.g., boxInstance.updateConfig({}); or boxInstance.resize();
-            } else if (diceBoxInstanceRef.current !== boxInstance) {
-              console.log("DiceBox init: instance mismatch, cleaning up orphaned instance.");
-              boxInstance?.clear?.();
+      box.init()
+        .then(() => {
+          if (isEffectMounted && diceBoxInstanceRef.current === box) { 
+            console.log("DiceBox Initialized with LOCAL assets!");
+            setIsDiceBoxReady(true);
+          } else if (isEffectMounted && diceBoxInstanceRef.current !== box) {
+            console.log("DiceBox init: instance mismatch, cleaning up orphaned instance.");
+            box.clear?.(); 
+          }
+        })
+        .catch(err => {
+          if (isEffectMounted) {
+            console.error("DiceBox init failed (Local Assets):", err);
+            if (diceBoxInstanceRef.current === box) {
+              diceBoxInstanceRef.current = null;
             }
-          })
-          .catch(err => {
-            if (isEffectMounted) {
-              console.error("DiceBox init failed (Local Assets):", err);
-              if (diceBoxInstanceRef.current === boxInstance) {
-                diceBoxInstanceRef.current = null;
-              }
-              setIsDiceBoxReady(false);
-            }
-          });
-      } catch (error) {
-        console.error("Error creating DiceBox instance:", error);
-        setIsDiceBoxReady(false);
-      }
+            setIsDiceBoxReady(false);
+          }
+        });
     }
 
-   return () => {
-  isEffectMounted = false; // From your current code, this is good
-  console.log("DiceRoller: useEffect cleanup. Current ref:", diceBoxInstanceRef.current);
-  const instanceToClean = diceBoxInstanceRef.current;
-
-  if (instanceToClean) {
-    console.log("Cleaning DiceBox instance: Attempting clear if function exists.");
-    if (instanceToClean.clear && typeof instanceToClean.clear === 'function') {
-      try {
-        instanceToClean.clear();
-        console.log("DiceBox instance .clear() called.");
-      } catch (e: any) {
-        // Log the error from clear() but don't let it stop the rest of the cleanup
-        console.warn("Error during instanceToClean.clear():", e.message);
+    return () => {
+      isEffectMounted = false;
+      console.log("DiceRoller: useEffect cleanup.");
+      const instanceToClean = diceBoxInstanceRef.current;
+      if (instanceToClean) {
+        console.log("Cleaning DiceBox instance.");
+        instanceToClean.clear?.();
+        // Consider instanceToClean.destroy?.() if available & needed for full cleanup
       }
-    } else {
-      console.log("instanceToClean.clear was not a function or did not exist.");
-    }
-    // If DiceBox had a more specific destroy method, it would be called here.
-    // e.g., instanceToClean.destroy?.();
-  }
-  diceBoxInstanceRef.current = null;
-  setIsDiceBoxReady(false); // Always reset ready state on cleanup
-};
-  }, []); // Empty dependency array for one-time setup
+      diceBoxInstanceRef.current = null;
+      setIsDiceBoxReady(false);
+    };
+  }, []); 
 
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
@@ -240,7 +217,14 @@ export const DiceRoller: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative min-h-[400px] bg-transparent rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30">
+        <div 
+            className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30"
+            style={{ 
+                minHeight: '400px', 
+                height: '400px',    
+                width: '100%'       
+            }}
+        >
           {!isDiceBoxReady && !diceBoxInstanceRef.current && (
             <div className="absolute inset-0 flex items-center justify-center text-foreground/50"><p>Loading 3D Dice...</p></div>
           )}
@@ -249,8 +233,18 @@ export const DiceRoller: React.FC = () => {
                 <p className="flex items-center"><Info size={20} className="mr-2" />Roll the dice!</p>
              </div>
            )}
-          <div ref={diceContainerRef} id="dice-box-container" style={{ width: '100%', height: '400px', position: 'absolute', top: 0, left: 0 }}>
-            {/* This div should remain empty for DiceBox to use */}
+          <div 
+            ref={diceContainerDivRef} 
+            id="dice-box-container" 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              position: 'absolute', 
+              top: 0, 
+              left: 0 
+            }}
+          >
+            {/* This div is for DiceBox */}
           </div>
         </div>
         
