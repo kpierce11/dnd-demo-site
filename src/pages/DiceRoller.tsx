@@ -34,57 +34,79 @@ export const DiceRoller: React.FC = () => {
   const diceBoxInstanceRef = useRef<DiceBox | null>(null);
   const [isDiceBoxReady, setIsDiceBoxReady] = useState(false);
 
- useEffect(() => {
-  let isActive = true; // Tracks if this specific effect run is still active
+useEffect(() => {
+  let isActive = true;
   let anInstanceWasCreatedInThisEffectRun: DiceBox | null = null;
 
-  if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
-    // ... (console.log for attempting init)
+  console.log("DiceRoller: useEffect triggered.");
+  console.log("DiceRoller: At start of useEffect, diceBoxInstanceRef.current:", diceBoxInstanceRef.current);
+  console.log("DiceRoller: At start of useEffect, diceContainerDivRef.current:", diceContainerDivRef.current);
 
-    const newBox = new DiceBox({ /* ... your config ... */ });
-    anInstanceWasCreatedInThisEffectRun = newBox; // Store locally for this effect's scope
-    diceBoxInstanceRef.current = newBox; // Share with the component
-    setIsDiceBoxReady(false);
+  if (!diceBoxInstanceRef.current && diceContainerDivRef.current) {
+    console.log("DiceRoller: ENTERING INITIALIZATION BLOCK - Attempting DiceBox Init."); // Key log
+
+    const diceBoxConfig = {
+      id: 'dice-box-container', // Make sure this matches your div ID
+      assetPath: '/assets/dice-box/', // Ensure assets are in public/assets/dice-box/
+      theme: 'default',
+      offscreen: true, // Renders dice offscreen first then displays
+      scale: 30,
+      gravity: 1,
+      throwForce: 5,
+    };
+    console.log("DiceRoller: DiceBox Config being used:", diceBoxConfig); // Log the config
+
+    const newBox = new DiceBox(diceBoxConfig);
+    anInstanceWasCreatedInThisEffectRun = newBox;
+    diceBoxInstanceRef.current = newBox;
+    setIsDiceBoxReady(false); // Set to false before init
 
     newBox.init()
       .then(() => {
-        if (isActive && diceBoxInstanceRef.current === newBox) { // Still active and ref still points to *this* newBox
-          // ... (console.log for success)
+        if (isActive && diceBoxInstanceRef.current === newBox) {
+          console.log("DiceRoller: DiceBox Initialized with LOCAL assets! SUCCESS!");
           setIsDiceBoxReady(true);
         } else {
-          // ... (console.warn for mismatch or unmounted, attempt to clear newBox specifically)
-          newBox.clear?.(); 
+          console.warn("DiceRoller: DiceBox init completed, but instance mismatch or component unmounted/effect re-ran. Orphaned instance clear attempted.");
+          newBox.clear?.(); // Cleanup the orphaned box
         }
       })
       .catch(err => {
         if (isActive) {
-          // ... (console.error for init failure)
-          if (diceBoxInstanceRef.current === newBox) { // If the main ref still points to this failed box
+          console.error("DiceRoller: DiceBox init FAILED (Local Assets):", err);
+          if (diceBoxInstanceRef.current === newBox) {
             diceBoxInstanceRef.current = null;
           }
           setIsDiceBoxReady(false);
         }
       });
-  } // ... (else logic for existing instance or missing div)
+  } else {
+    // This will tell you why the initialization block was skipped
+    if (diceBoxInstanceRef.current) {
+      console.log("DiceRoller: SKIPPING DiceBox Init because diceBoxInstanceRef.current already exists. Instance:", diceBoxInstanceRef.current);
+    }
+    if (!diceContainerDivRef.current) {
+      console.log("DiceRoller: SKIPPING DiceBox Init because diceContainerDivRef.current is null.");
+    }
+  }
 
   return () => {
     isActive = false;
-    // ... (console.log for cleanup)
-    if (anInstanceWasCreatedInThisEffectRun) { // If this effect run created an instance
+    console.log("DiceRoller: EFFECT CLEANUP - Cleaning up DiceBox instance.");
+    if (anInstanceWasCreatedInThisEffectRun) {
       try {
-        // ... (console.log attempt to clear anInstanceWasCreatedInThisEffectRun)
+        console.log("DiceRoller: Cleanup - Attempting to clear DiceBox instance created by this effect run.");
         anInstanceWasCreatedInThisEffectRun.clear?.();
       } catch (e: any) {
-        // ... (console.warn for error during clear)
+          console.warn("DiceRoller: Cleanup - Error during specific DiceBox instance .clear():", e.message);
       }
     }
-    // Only null out the shared ref if it's the one this effect managed
     if (diceBoxInstanceRef.current === anInstanceWasCreatedInThisEffectRun) {
         diceBoxInstanceRef.current = null;
     }
-    setIsDiceBoxReady(false); 
+    setIsDiceBoxReady(false);
   };
-}, []); // Empty dependency array means this should run once on mount, cleanup on unmount
+}, []); // Empty dependency array
 
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
