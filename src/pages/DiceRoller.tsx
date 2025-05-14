@@ -36,7 +36,7 @@ export const DiceRoller: React.FC = () => {
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
-    const diceCanvasRef = useRef<HTMLCanvasElement | null>(null); // Ref for the canvas element
+    const diceCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
 	useEffect(() => {
 		console.log("Starting DiceBox initialization (Full Screen)...");
@@ -60,14 +60,12 @@ export const DiceRoller: React.FC = () => {
 		const diceCanvasId = 'dice-box-fullscreen-canvas';
 		let diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
 
-		// Remove existing canvas if it's in the body (from previous unmounts in strict mode)
 		if (diceCanvas && diceCanvas.parentNode === document.body) {
 			console.log("Removing existing DiceBox canvas from body before initialization:", diceCanvas);
 			document.body.removeChild(diceCanvas);
-			diceCanvas = null; // Clear the reference after removing
+			diceCanvas = null;
 		}
 
-		// Create a new canvas if it doesn't exist
         if (!diceCanvas) {
             diceCanvas = document.createElement('canvas');
             diceCanvas.id = diceCanvasId;
@@ -75,20 +73,34 @@ export const DiceRoller: React.FC = () => {
             console.log("Created and appended new DiceBox canvas to body:", diceCanvas);
         }
 
-        // Store canvas in a ref for easier access in resize handler cleanup
         diceCanvasRef.current = diceCanvas;
 
-        // Set canvas resolution *before* initializing DiceBox
+        // Set canvas CSS styles *before* initializing DiceBox
+        if (diceCanvas) {
+            console.log("Applying initial canvas full screen styles (CSS)");
+            diceCanvas.style.position = 'fixed';
+            diceCanvas.style.top = '0';
+            diceCanvas.style.left = '0';
+            diceCanvas.style.width = '100%';
+            diceCanvas.style.height = '100%';
+            diceCanvas.style.zIndex = '1000';
+            diceCanvas.style.pointerEvents = 'none';
+        }
+
+
+        // Set canvas resolution attributes *before* initializing DiceBox
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
-        diceCanvas.width = windowWidth;
-        diceCanvas.height = windowHeight;
-        console.log(`Set initial canvas resolution to ${windowWidth}x${windowHeight}`);
+         if (diceCanvas) {
+            diceCanvas.width = windowWidth;
+            diceCanvas.height = windowHeight;
+            console.log(`Set initial canvas resolution attributes to ${windowWidth}x${windowHeight}`);
+        }
 
 
 		try {
 			const config = {
-				container: 'body', // Keep container as body as per original logic
+				container: 'body',
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
 				scale: 20,
@@ -110,22 +122,8 @@ export const DiceRoller: React.FC = () => {
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
 
-					// Apply initial CSS styles after init
-					if (diceCanvasRef.current) {
-						console.log("Applying initial canvas full screen styles");
-						diceCanvasRef.current.style.position = 'fixed';
-						diceCanvasRef.current.style.top = '0';
-						diceCanvasRef.current.style.left = '0';
-						diceCanvasRef.current.style.width = '100%';
-						diceCanvasRef.current.style.height = '100%';
-						diceCanvasRef.current.style.zIndex = '1000';
-						diceCanvasRef.current.style.pointerEvents = 'none';
-					}
-
-
 					if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 						console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-                        // Also call resize on init if available, might be needed by the library
                         diceBoxRef.current.resize(windowWidth, windowHeight);
 					} else {
 						console.warn("DiceBox resize method not found or supported. Relying on setting attributes for resolution.");
@@ -153,7 +151,7 @@ export const DiceRoller: React.FC = () => {
 				// Update canvas resolution on resize
 				diceCanvas.width = windowWidth;
 				diceCanvas.height = windowHeight;
-                console.log(`Updated canvas resolution to ${windowWidth}x${windowHeight}`);
+                console.log(`Updated canvas resolution attributes to ${windowWidth}x${windowHeight}`);
 
 
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
@@ -184,7 +182,6 @@ export const DiceRoller: React.FC = () => {
 				}
 			}
 
-            // Clean up the canvas element from the body
 			const diceCanvas = document.getElementById(diceCanvasId);
 			if (diceCanvas && diceCanvas.parentNode === document.body) {
 				console.log("Removing DiceBox canvas from body during cleanup:", diceCanvas);
