@@ -35,7 +35,7 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
-  useEffect(() => {
+ useEffect(() => {
     if (!diceContainerRef.current) return;
     
     console.log("Starting DiceBox initialization...");
@@ -190,26 +190,33 @@ export const DiceRoller: React.FC = () => {
         notation = `${numDice}d${typeOfDice}`;
       }
 
+      // Clear any previous dice
       await diceBoxRef.current.clear();
+      
+      // Roll the dice and wait for results
       const rollResults = await diceBoxRef.current.roll(notation);
       
       if (currentAdvantage !== 'normal' && typeOfDice === 20) {
+        // Sort for advantage/disadvantage
         rollResults.sort((a, b) => 
           currentAdvantage === 'advantage' ? b.value - a.value : a.value - b.value
         );
         const chosenDie = rollResults[0];
         setTotal(chosenDie.value + currentModifier);
       } else {
+        // Sum the dice values
         const sumOfDice = rollResults.reduce((sum, die) => sum + die.value, 0);
         setTotal(sumOfDice + currentModifier);
       }
       
+      // Convert results to our format
       setDiceResults(rollResults.map((d, index) => ({ 
         type: d.sides, 
         value: d.value, 
         id: `${Date.now()}-${index}` 
       })));
       
+      // Finish rolling after a delay
       setTimeout(() => { 
         playSound('success'); 
         setIsRolling(false); 
@@ -254,6 +261,7 @@ export const DiceRoller: React.FC = () => {
     rollDice(saved);
   };
 
+  // Common roll presets
   const commonRolls = [
     { name: 'Attack Roll', description: 'd20 + ability modifier + proficiency', dice: 1, diceType: 20, modifier: 5 },
     { name: 'Damage Roll', description: 'Weapon damage + ability modifier', dice: 1, diceType: 8, modifier: 3 },
