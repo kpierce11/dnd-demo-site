@@ -41,7 +41,7 @@ export const DiceRoller: React.FC = () => {
       console.log("DiceRoller: EFFECT - Attempting DiceBox Init (Local Assets)");
       
       const newBox = new DiceBox({
-        container: diceContainerDivRef.current,
+        id: 'dice-box-container',
         assetPath: '/assets/dice-box/',
         theme: 'default',
         offscreen: true,
