@@ -84,36 +84,37 @@ export const DiceRoller: React.FC = () => {
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
 
-					setTimeout(() => {
-						const diceCanvas = document.getElementById(diceCanvasId);
+					// Moved canvas styling and pointerEvents logic inside the check
+					const diceCanvas = document.getElementById(diceCanvasId);
+					if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
+						console.log("Found dice canvas, applying full screen styles");
 
-						if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-							console.log("Found dice canvas, applying full screen styles");
+						diceCanvas.style.position = 'fixed';
+						diceCanvas.style.top = '0';
+						diceCanvas.style.left = '0';
+						diceCanvas.style.width = '100%'; // Ensure canvas fills the screen
+						diceCanvas.style.height = '100%'; // Ensure canvas fills the screen
+						diceCanvas.style.zIndex = '1000'; // Set a high z-index to appear in front
+						diceCanvas.style.pointerEvents = 'none'; // Initially no pointer events
 
-							diceCanvas.style.position = 'fixed';
-							diceCanvas.style.top = '0';
-							diceCanvas.style.left = '0';
-							canvas.style.width = '100%'; // Ensure canvas fills the screen
-							canvas.style.height = '100%'; // Ensure canvas fills the screen
-							diceCanvas.style.zIndex = '1000';
-							diceCanvas.style.pointerEvents = 'none'; // Initially no pointer events
+						const windowWidth = window.innerWidth;
+						const windowHeight = window.innerHeight;
 
-							const windowWidth = window.innerWidth;
-							const windowHeight = window.innerHeight;
-
-							if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-								console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-							} else {
-								console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
-							}
-
+						if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+							console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+							// Note: As previously observed, this method might not exist or work in this version.
+							// We rely on CSS for sizing.
+							// diceBoxRef.current.resize(windowWidth, windowHeight);
 						} else {
-							console.warn(`Dice canvas with ID '${diceCanvasId}' not found after initialization.`);
-							const allBodyCanvases = document.body.querySelectorAll('canvas');
-							console.log(`Found ${allBodyCanvases.length} canvas elements directly in body:`,
-								Array.from(allBodyCanvases).map(c => c.id || 'unnamed canvas'));
+							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
 						}
-					}, 100);
+
+					} else {
+						console.warn(`Dice canvas with ID '${diceCanvasId}' not found after initialization.`);
+						const allBodyCanvases = document.body.querySelectorAll('canvas');
+						console.log(`Found ${allBodyCanvases.length} canvas elements directly in body:`,
+							Array.from(allBodyCanvases).map(c => c.id || 'unnamed canvas'));
+					}
 
 					setIsDiceBoxReady(true);
 				})
@@ -136,6 +137,7 @@ export const DiceRoller: React.FC = () => {
 
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
+					// diceBoxRef.current.resize(windowWidth, windowHeight); // Still commented out
 				} else {
 					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
 				}
@@ -199,13 +201,14 @@ export const DiceRoller: React.FC = () => {
 		}
 	}, [savedRolls]);
 
-	const handleCanvasClick = () => {
+	// Click handler for the overlay div
+	const handleOverlayClick = () => {
 		if (diceBoxRef.current && !isRolling) {
-            console.log("Canvas clicked, attempting to clear dice.");
+            console.log("Overlay clicked, attempting to clear dice.");
 			diceBoxRef.current.clear();
 			setDiceResults([]);
 			setTotal(null);
-            // Temporarily enable pointer events for the canvas during rolling
+            // Disable pointer events for the canvas once cleared
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
@@ -230,12 +233,11 @@ export const DiceRoller: React.FC = () => {
 		const currentModifier = customRoll?.modifier || modifier;
 		const currentAdvantage = customRoll?.advantage || advantage;
 
-        // Temporarily enable pointer events for the canvas during rolling
+        // Enable pointer events for the canvas during rolling
         const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
         if (diceCanvas) {
             diceCanvas.style.pointerEvents = 'auto';
         }
-
 
 		try {
 			let notation;
@@ -260,13 +262,11 @@ export const DiceRoller: React.FC = () => {
 				id: `${Date.now()}-${index}`
 			})));
 
-            // Add a listener to the DiceBox itself to detect when rolling stops
             diceBoxRef.current.onRollComplete = (results: any) => {
                 console.log("Roll complete:", results);
                 playSound('success');
                 setIsRolling(false);
-                // The canvas pointerEvents are already 'auto' at this point,
-                // allowing the handleCanvasClick to fire on the next click.
+                // Pointer events remain 'auto' after roll complete, allowing overlay click to work
             };
 
 		} catch (error) {
@@ -329,16 +329,16 @@ export const DiceRoller: React.FC = () => {
 
 	const diceTypes = [4, 6, 8, 10, 12, 20, 100];
 	const numberOfDiceOptions = Array.from({ length: 20 }, (_, i) => i + 1);
-	const modifierOptions = Array.from({ length: 21 }, (_, i) => i - 10); // Modifiers from -10 to +10
+	const modifierOptions = Array.from({ length: 21 }, (_, i) => i - 10);
 
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
 			{/* Overlay div to capture clicks when result is visible */}
             {total !== null && !isRolling && (
                 <div
-                    className="fixed inset-0 z-[999] cursor-pointer" // Z-index lower than canvas (1000) but higher than content (z-20)
-                    onClick={handleCanvasClick}
-					aria-hidden="true" // Hide from screen readers as it's purely for click handling
+                    className="fixed inset-0 z-[999] cursor-pointer"
+                    onClick={handleOverlayClick}
+					aria-hidden="true"
                 ></div>
             )}
 
