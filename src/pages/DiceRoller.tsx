@@ -36,135 +36,105 @@ export const DiceRoller: React.FC = () => {
 
   // Initialize DiceBox once on component mount
  useEffect(() => {
-  if (!diceContainerRef.current) return;
-  
-  console.log("Starting DiceBox initialization...");
-  
-  // Clean up any existing instance first
-  if (diceBoxRef.current) {
-    try {
-      if (typeof diceBoxRef.current.clear === 'function') {
-        diceBoxRef.current.clear();
-      }
-    } catch (e) {
-      console.warn("Error clearing previous DiceBox instance:", e);
-    }
-    diceBoxRef.current = null;
-  }
-
-  try {
-    // Only use officially documented configuration options
-    const config = {
-      container: '#dice-box-container', // This is required
-      assetPath: '/assets/dice-box/',   // Path to assets
-      theme: 'default',                // Use default theme
-      scale: 20,                        // Start with a smaller scale (default is 5)
-      gravity: 1,                      // Default gravity
-      throwForce: 6,                   // Default throw force
-      spinForce: 3,                    // Default spin force
-      lightIntensity: 0.8,             // Default light intensity
-      shadowTransparency: 0.8,         // Default shadow transparency
-    };
-
-    console.log("Creating new DiceBox with config:", config);
+    if (!diceContainerRef.current) return;
     
-    // Create new DiceBox instance
-    const newDiceBox = new DiceBox(config);
-    diceBoxRef.current = newDiceBox;
-    // Initialize dicebox 
-     console.log("Initializing DiceBox...");
-    newDiceBox.init()
-      .then(() => {
-        console.log("DiceBox initialized successfully!");
-        
-        // After initialization, find the dice canvas and resize it
-        setTimeout(() => {
-    if (diceContainerRef.current) {
-      // Select the canvas created by DiceBox inside the container
-      const canvasEl = diceContainerRef.current.querySelector('canvas');
-
-      if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-        console.log(`Found DiceBox canvas (ID: ${canvasEl.id || 'none'}), resizing it.`);
-        
-        const containerWidth = diceContainerRef.current.clientWidth;
-        const containerHeight = diceContainerRef.current.clientHeight;
-        
-        // Set canvas actual drawing dimensions
-        canvasEl.width = containerWidth;
-        canvasEl.height = containerHeight;
-        
-        // Set canvas style dimensions to fill the container
-        canvasEl.style.width = '100%';
-        canvasEl.style.height = '100%';
-            
-            console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
-          } else {
-            console.warn("Dice canvas not found or not a canvas element");
-            
-            // List all canvases to help debug
-            const allCanvases = document.querySelectorAll('canvas');
-            console.log(`Found ${allCanvases.length} canvas elements:`, 
-                         Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
-          }
-        }
-        }, 100);
-      })
-        
-        setIsDiceBoxReady(true);
-      })
-      .catch((error) => {
-        console.error("Failed to initialize DiceBox:", error);
-        setIsDiceBoxReady(false);
-      });
-  } catch (error) {
-    console.error("Error creating DiceBox:", error);
-    setIsDiceBoxReady(false);
-  }
-
-  // Add window resize handler
-  const handleResize = () => {
-  if (diceContainerRef.current) {
-    const canvasEl = diceContainerRef.current.querySelector('canvas');
-    if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-      const containerWidth = diceContainerRef.current.clientWidth;
-      const containerHeight = diceContainerRef.current.clientHeight;
-      
-      canvasEl.width = containerWidth;
-      canvasEl.height = containerHeight;
-      console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
-    }
-    }
-  };
-  
-  window.addEventListener('resize', handleResize);
-
-  // Clean up on component unmount
-  return () => {
-    window.removeEventListener('resize', handleResize);
-    diceBoxRef.current = null;
-  };
-}, []);
-
-  // Load saved rolls from localStorage
-  useEffect(() => {
-    const savedRollsData = localStorage.getItem('savedRolls');
-    if (savedRollsData) {
+    console.log("Starting DiceBox initialization...");
+    
+    // Clean up any existing instance first
+    if (diceBoxRef.current) {
       try {
-        setSavedRolls(JSON.parse(savedRollsData));
-      } catch (e) { 
-        setSavedRolls([]);
+        if (typeof diceBoxRef.current.clear === 'function') {
+          diceBoxRef.current.clear();
+        }
+      } catch (e) {
+        console.warn("Error clearing previous DiceBox instance:", e);
       }
-    } else {
-      const defaultRolls = [
-        { name: 'Attack Roll', dice: 1, diceType: 20, modifier: 5 },
-        { name: 'Damage (1d8+3)', dice: 1, diceType: 8, modifier: 3 },
-        { name: 'Fireball (8d6)', dice: 8, diceType: 6, modifier: 0 },
-        { name: 'Dagger Attack', dice: 1, diceType: 4, modifier: 3 },
-        { name: 'Greatsword (2d6+4)', dice: 2, diceType: 6, modifier: 4 },
-      ];
-      setSavedRolls(defaultRolls);
-      localStorage.setItem('savedRolls', JSON.stringify(defaultRolls));
+      diceBoxRef.current = null;
     }
+
+    try {
+      const config = {
+        container: '#dice-box-container',
+        assetPath: '/assets/dice-box/',
+        theme: 'default',
+        scale: 20,
+        gravity: 1,
+        throwForce: 6,
+        spinForce: 3,
+        lightIntensity: 0.8,
+        shadowTransparency: 0.8,
+      };
+
+      console.log("Creating new DiceBox with config:", config);
+      
+      const newDiceBox = new DiceBox(config);
+      diceBoxRef.current = newDiceBox;
+      
+      console.log("Initializing DiceBox...");
+      newDiceBox.init()
+        .then(() => { // Start of .then() for init
+          console.log("DiceBox initialized successfully!");
+          
+          setTimeout(() => {
+            if (diceContainerRef.current) {
+              const canvasEl = diceContainerRef.current.querySelector('canvas');
+              if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+                console.log(`Found DiceBox canvas (ID: ${canvasEl.id || 'none'}), resizing it.`);
+                
+                const containerWidth = diceContainerRef.current.clientWidth;
+                const containerHeight = diceContainerRef.current.clientHeight;
+                
+                canvasEl.width = containerWidth;
+                canvasEl.height = containerHeight;
+                
+                canvasEl.style.width = '100%';
+                canvasEl.style.height = '100%';
+                    
+                console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
+              } else {
+                console.warn("Dice canvas not found or not a canvas element");
+                const allCanvases = document.querySelectorAll('canvas');
+                console.log(`Found ${allCanvases.length} canvas elements:`, 
+                             Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+              }
+            }
+          }, 100);
+          setIsDiceBoxReady(true); // Moved here
+        }) // End of .then() for init
+        .catch((error) => { // Correctly chained .catch for init()
+          console.error("Failed to initialize DiceBox:", error);
+          setIsDiceBoxReady(false);
+        });
+    } catch (error) {
+      console.error("Error creating DiceBox:", error);
+      setIsDiceBoxReady(false);
+    }
+
+    const handleResize = () => {
+      if (diceContainerRef.current) {
+        const canvasEl = diceContainerRef.current.querySelector('canvas');
+        if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+          const containerWidth = diceContainerRef.current.clientWidth;
+          const containerHeight = diceContainerRef.current.clientHeight;
+          
+          canvasEl.width = containerWidth;
+          canvasEl.height = containerHeight;
+          // Corrected variable name here:
+          console.log(`Resized dice canvas to ${canvasEl.width}x${canvasEl.height}`);
+        }
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      // Consider adding a more thorough DiceBox cleanup if the library provides it
+      // e.g., if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
+      //   diceBoxRef.current.destroy();
+      // }
+      diceBoxRef.current = null;
+    };
   }, []);
 
   // Save rolls to localStorage when they change
