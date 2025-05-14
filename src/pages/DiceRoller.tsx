@@ -36,23 +36,28 @@ export const DiceRoller: React.FC = () => {
 
  useEffect(() => {
   if (!diceContainerRef.current) return;
-  
+
   console.log("Starting DiceBox initialization...");
-  
+
   // Clean up any existing instance first
   if (diceBoxRef.current) {
     try {
       if (typeof diceBoxRef.current.clear === 'function') {
         diceBoxRef.current.clear();
       }
+      // Attempt more robust cleanup if DiceBox API provides it
+      if (typeof diceBoxRef.current.dispose === 'function') {
+          diceBoxRef.current.dispose();
+      } else if (typeof diceBoxRef.current.destroy === 'function') {
+          diceBoxRef.current.destroy();
+      }
     } catch (e) {
-      console.warn("Error clearing previous DiceBox instance:", e);
+      console.warn("Error cleaning up previous DiceBox instance:", e);
     }
     diceBoxRef.current = null;
   }
 
   try {
-    // Use documented configuration options
     const config = {
       container: '#dice-box-container',
       assetPath: '/assets/dice-box/',
@@ -66,50 +71,42 @@ export const DiceRoller: React.FC = () => {
     };
 
     console.log("Creating new DiceBox with config:", config);
-    
-    // Create new DiceBox instance
+
     const newDiceBox = new DiceBox(config);
     diceBoxRef.current = newDiceBox;
-    
-    // Initialize DiceBox
+
     console.log("Initializing DiceBox...");
     newDiceBox.init()
       .then(() => {
         console.log("DiceBox initialized successfully!");
-        
+
         // After initialization, find the dice canvas and resize it
         setTimeout(() => {
-          // Allow a brief delay for rendering
           const diceCanvas = document.getElementById('dice-canvas');
-          if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
+          if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
             console.log("Found dice canvas, resizing it");
-            
-            // Get the container dimensions
-            const containerWidth = diceContainerRef.current?.clientWidth || 1000;
-            const containerHeight = diceContainerRef.current?.clientHeight || 290;
-            
-            // Set canvas dimensions to match container
+
+            const containerWidth = diceContainerRef.current.clientWidth;
+            const containerHeight = diceContainerRef.current.clientHeight;
+
             diceCanvas.width = containerWidth;
             diceCanvas.height = containerHeight;
-            
-            // Update styles to fill the container
+
             diceCanvas.style.width = '100%';
             diceCanvas.style.height = '100%';
             diceCanvas.style.position = 'absolute';
             diceCanvas.style.top = '0';
             diceCanvas.style.left = '0';
-            
+
             console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
           } else {
             console.warn("Dice canvas not found or not a canvas element");
-            
-            // List all canvases to help debug
             const allCanvases = document.querySelectorAll('canvas');
-            console.log(`Found ${allCanvases.length} canvas elements:`, 
+            console.log(`Found ${allCanvases.length} canvas elements:`,
                          Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
           }
-        }, 100);
-        
+        }, 100); // Short delay to allow rendering
+
         setIsDiceBoxReady(true);
       })
       .catch((error) => {
@@ -121,34 +118,41 @@ export const DiceRoller: React.FC = () => {
     setIsDiceBoxReady(false);
   }
 
-  // Add window resize handler
   const handleResize = () => {
     const diceCanvas = document.getElementById('dice-canvas');
     if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-      // Update canvas dimensions when window resizes
       diceCanvas.width = diceContainerRef.current.clientWidth;
       diceCanvas.height = diceContainerRef.current.clientHeight;
       console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
     }
   };
-  
+
   window.addEventListener('resize', handleResize);
 
-  // Clean up on component unmount
   return () => {
     window.removeEventListener('resize', handleResize);
+    if (diceBoxRef.current) {
+       try {
+          if (typeof diceBoxRef.current.dispose === 'function') {
+              diceBoxRef.current.dispose();
+          } else if (typeof diceBoxRef.current.destroy === 'function') {
+              diceBoxRef.current.destroy();
+          }
+       } catch (e) {
+           console.warn("Error disposing of DiceBox instance:", e);
+       }
+    }
     diceBoxRef.current = null;
   };
 }, []);
 
 
-  // Load saved rolls from localStorage
   useEffect(() => {
     const savedRollsData = localStorage.getItem('savedRolls');
     if (savedRollsData) {
       try {
         setSavedRolls(JSON.parse(savedRollsData));
-      } catch (e) { 
+      } catch (e) {
         setSavedRolls([]);
       }
     } else {
@@ -164,7 +168,6 @@ export const DiceRoller: React.FC = () => {
     }
   }, []);
 
-  // Save rolls to localStorage when they change
   useEffect(() => {
     if (savedRolls.length > 0 || localStorage.getItem('savedRolls') !== null) {
       localStorage.setItem('savedRolls', JSON.stringify(savedRolls));
@@ -176,7 +179,7 @@ export const DiceRoller: React.FC = () => {
       console.warn("DiceBox not ready for roll. isDiceBoxReady:", isDiceBoxReady, "diceBoxRef.current:", diceBoxRef.current);
       return;
     }
-    
+
     setIsRolling(true);
     setTotal(null);
     setDiceResults([]);
@@ -195,13 +198,13 @@ export const DiceRoller: React.FC = () => {
         notation = `${numDice}d${typeOfDice}`;
       }
 
-      await diceBoxRef.current.clear(); // Clear previous dice
+      await diceBoxRef.current.clear();
       console.log("Rolling dice with notation:", notation);
       const rollResults = await diceBoxRef.current.roll(notation);
       console.log("Roll results from DiceBox:", rollResults);
-      
+
       if (currentAdvantage !== 'normal' && typeOfDice === 20) {
-        rollResults.sort((a, b) => 
+        rollResults.sort((a, b) =>
           currentAdvantage === 'advantage' ? b.value - a.value : a.value - b.value
         );
         const chosenDie = rollResults[0];
@@ -210,24 +213,24 @@ export const DiceRoller: React.FC = () => {
         const sumOfDice = rollResults.reduce((sum, die) => sum + die.value, 0);
         setTotal(sumOfDice + currentModifier);
       }
-      
-      setDiceResults(rollResults.map((d: any, index: number) => ({ 
-        type: d.sides, 
-        value: d.value, 
-        id: `${Date.now()}-${index}` 
+
+      setDiceResults(rollResults.map((d: any, index: number) => ({
+        type: d.sides,
+        value: d.value,
+        id: `${Date.now()}-${index}`
       })));
-      
-      setTimeout(() => { 
-        playSound('success'); 
-        setIsRolling(false); 
+
+      setTimeout(() => {
+        playSound('success');
+        setIsRolling(false);
       }, 1500);
-      
+
     } catch (error) {
       console.error("Error rolling with DiceBox:", error);
       setIsRolling(false);
     }
   };
-  
+
   const getResultsString = () => {
     if (diceResults.length === 0) return total !== null ? "Processing..." : "";
     return diceResults.map(d => d.value.toString()).join(' + ');
@@ -235,11 +238,11 @@ export const DiceRoller: React.FC = () => {
 
   const handleSaveRoll = () => {
     if (newRollName.trim()) {
-      const newRoll: SavedRoll = { 
-        name: newRollName, 
-        dice: numberOfDice, 
-        diceType: diceType, 
-        modifier: modifier 
+      const newRoll: SavedRoll = {
+        name: newRollName,
+        dice: numberOfDice,
+        diceType: diceType,
+        modifier: modifier
       };
       setSavedRolls(prevRolls => [...prevRolls, newRoll]);
       setNewRollName('');
@@ -272,23 +275,23 @@ export const DiceRoller: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="magical-card mb-8 p-6 md:p-8"
+        className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // Added flex flex-col flex-grow
       >
         <h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
-        
+
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center mb-6 gap-4 flex-wrap">
             <div className="flex items-center">
               <label htmlFor="diceCount" className="mr-2 w-auto md:w-20">Dice:</label>
-              <select 
-                id="diceCount" 
-                className="bg-muted text-foreground p-2 rounded-md w-20" 
-                value={numberOfDice} 
-                onChange={(e) => setNumberOfDice(parseInt(e.target.value))} 
+              <select
+                id="diceCount"
+                className="bg-muted text-foreground p-2 rounded-md w-20"
+                value={numberOfDice}
+                onChange={(e) => setNumberOfDice(parseInt(e.target.value))}
                 disabled={isRolling || !isDiceBoxReady}
               >
                 {Array.from({ length: 20 }, (_, i) => i + 1).map(num => (
@@ -296,17 +299,17 @@ export const DiceRoller: React.FC = () => {
                 ))}
               </select>
             </div>
-            
+
             <div className="flex items-center">
               <span className="mx-2 text-xl">d</span>
-              <select 
-                className="bg-muted text-foreground p-2 rounded-md w-20" 
-                value={diceType} 
+              <select
+                className="bg-muted text-foreground p-2 rounded-md w-20"
+                value={diceType}
                 onChange={(e) => {
                   const newType = parseInt(e.target.value);
                   setDiceType(newType);
                   if (newType !== 20) setAdvantage('normal');
-                }} 
+                }}
                 disabled={isRolling || !isDiceBoxReady}
               >
                 {[4, 6, 8, 10, 12, 20, 100].map(typeValue => (
@@ -314,24 +317,24 @@ export const DiceRoller: React.FC = () => {
                 ))}
               </select>
             </div>
-            
+
             <div className="flex items-center">
               <span className="mx-2 text-xl">+</span>
-              <input 
-                type="number" 
-                className="bg-muted text-foreground p-2 rounded-md w-20" 
-                value={modifier} 
-                onChange={(e) => setModifier(parseInt(e.target.value) || 0)} 
+              <input
+                type="number"
+                className="bg-muted text-foreground p-2 rounded-md w-20"
+                value={modifier}
+                onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
                 disabled={isRolling || !isDiceBoxReady}
               />
             </div>
-            
+
             {diceType === 20 && (
               <div className="flex items-center ml-0 md:ml-4">
-                <select 
-                  className="bg-muted text-foreground p-2 rounded-md w-full md:w-40" 
-                  value={advantage} 
-                  onChange={(e) => setAdvantage(e.target.value)} 
+                <select
+                  className="bg-muted text-foreground p-2 rounded-md w-full md:w-40"
+                  value={advantage}
+                  onChange={(e) => setAdvantage(e.target.value)}
                   disabled={isRolling || !isDiceBoxReady}
                 >
                   <option value="normal">Normal Roll</option>
@@ -341,25 +344,25 @@ export const DiceRoller: React.FC = () => {
               </div>
             )}
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button 
-              className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50" 
-              onClick={() => rollDice()} 
+            <button
+              className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50"
+              onClick={() => rollDice()}
               disabled={isRolling || !isDiceBoxReady}
             >
               <DiceD20Icon size={20} />
               <span>
                 Roll {numberOfDice}d{diceType}
                 {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
-                {diceType === 20 && advantage !== 'normal' ? 
+                {diceType === 20 && advantage !== 'normal' ?
                   ` (${advantage === 'advantage' ? 'Advantage' : 'Disadvantage'})` : ''}
               </span>
             </button>
-            
-            <button 
-              className="bg-secondary hover:bg-secondary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300" 
-              onClick={() => setShowSaveDialog(true)} 
+
+            <button
+              className="bg-secondary hover:bg-secondary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300"
+              onClick={() => setShowSaveDialog(true)}
               disabled={isRolling || !isDiceBoxReady}
             >
               <Plus size={20} className="mr-2" />
@@ -368,14 +371,13 @@ export const DiceRoller: React.FC = () => {
           </div>
         </div>
 
-     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm"
-     style={{ minHeight: '300px', height: '300px', width: '100%' }}>
+     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm flex-grow"> {/* Added flex-grow */}
   {!isDiceBoxReady && (
     <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
       <p>Loading 3D Dice...</p>
     </div>
   )}
-  
+
   {isDiceBoxReady && diceResults.length === 0 && !isRolling && !total && (
     <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
       <p className="flex items-center">
@@ -384,23 +386,27 @@ export const DiceRoller: React.FC = () => {
       </p>
     </div>
   )}
-  
+
   <div ref={diceContainerRef}
        id="dice-box-container"
        className="absolute inset-0"
-       style={{ 
-         width: '100%', 
-         height: '100%', 
-         position: 'relative',
-         overflow: 'hidden' 
+       style={{
+         width: '100%',
+         height: '100%',
+         position: 'relative', // Changed to relative to work with absolute child
+         overflow: 'hidden'
+         // Removed minHeight and height inline styles
        }}
-  />
+  >
+    {/* The dice canvas will be appended here by DiceBox */}
+  </div>
 </div>
-        
+
+
         {total !== null && !isRolling && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             className="text-center mb-6"
           >
             <p className="text-xl">
@@ -412,28 +418,28 @@ export const DiceRoller: React.FC = () => {
             </p>
           </motion.div>
         )}
-        
+
         <div>
           <h3 className="text-xl font-bold mb-3">Saved Rolls</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {savedRolls.map((saved, index) => (
               <div key={index} className="bg-muted/30 rounded-lg p-3 group relative">
-                <button 
-                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-error/20 hover:bg-error rounded-full p-1 z-10" 
-                  onClick={() => handleDeleteSavedRoll(index)} 
+                <button
+                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-error/20 hover:bg-error rounded-full p-1 z-10"
+                  onClick={() => handleDeleteSavedRoll(index)}
                   aria-label={`Delete saved roll: ${saved.name}`}
                 >
                   <X size={14} />
                 </button>
-                
+
                 <div onClick={() => handleUseSavedRoll(saved)} className="cursor-pointer">
                   <h4 className="font-bold">{saved.name}</h4>
                   <p className="text-sm text-foreground/70">
                     {saved.dice}d{saved.diceType}
-                    {saved.modifier !== 0 ? (saved.modifier > 0 ? `+${saved.modifier}` : saved.modifier) : ''}
+                    {saved.modifier !== 0 ? (saved.modifier > 0 ? `+${saved.modifier}` : modifier) : ''}
                   </p>
-                  <button 
-                    tabIndex={-1} 
+                  <button
+                    tabIndex={-1}
                     className="mt-2 bg-primary/50 hover:bg-primary text-white py-1 px-3 rounded-md text-sm w-full"
                   >
                     Roll
@@ -444,21 +450,21 @@ export const DiceRoller: React.FC = () => {
           </div>
         </div>
       </motion.div>
-      
+
       <AnimatePresence>
         {showSaveDialog && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }} 
-            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" 
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
             onClick={() => setShowSaveDialog(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9 }} 
-              animate={{ scale: 1 }} 
-              exit={{ scale: 0.9 }} 
-              className="magical-card p-6 max-w-md w-full" 
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="magical-card p-6 max-w-md w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <h3 className="text-xl font-bold mb-4">Save Roll Configuration</h3>
@@ -466,29 +472,29 @@ export const DiceRoller: React.FC = () => {
                 Current: {numberOfDice}d{diceType}
                 {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
               </p>
-              
+
               <div className="mb-4">
                 <label htmlFor="rollName" className="block mb-2">Roll Name:</label>
-                <input 
-                  id="rollName" 
-                  type="text" 
-                  className="w-full p-2 bg-muted text-foreground rounded-md" 
-                  value={newRollName} 
-                  onChange={(e) => setNewRollName(e.target.value)} 
+                <input
+                  id="rollName"
+                  type="text"
+                  className="w-full p-2 bg-muted text-foreground rounded-md"
+                  value={newRollName}
+                  onChange={(e) => setNewRollName(e.target.value)}
                   placeholder="e.g., Greatsword Attack"
                 />
               </div>
-              
+
               <div className="flex justify-end gap-3">
-                <button 
-                  className="bg-muted hover:bg-muted/70 text-foreground py-2 px-4 rounded-md" 
+                <button
+                  className="bg-muted hover:bg-muted/70 text-foreground py-2 px-4 rounded-md"
                   onClick={() => setShowSaveDialog(false)}
                 >
                   Cancel
                 </button>
-                <button 
-                  className="bg-primary hover:bg-primary/80 text-white py-2 px-4 rounded-md" 
-                  onClick={handleSaveRoll} 
+                <button
+                  className="bg-primary hover:bg-primary/80 text-white py-2 px-4 rounded-md"
+                  onClick={handleSaveRoll}
                   disabled={!newRollName.trim()}
                 >
                   Save
@@ -498,19 +504,19 @@ export const DiceRoller: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        transition={{ duration: 0.5, delay: 0.2 }} 
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
         className="magical-card p-6"
       >
         <h2 className="text-xl font-bold mb-4">Common Dice Rolls</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {commonRolls.map((roll, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className="bg-muted/30 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
               onClick={() => handleUseSavedRoll(roll)}
             >
@@ -519,7 +525,7 @@ export const DiceRoller: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
                   {roll.dice}d{roll.diceType}
-                  {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ''}
+                  {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
                 </span>
                 <button className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md">
                   Roll
@@ -528,7 +534,7 @@ export const DiceRoller: React.FC = () => {
             </div>
           ))}
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <h3 className="font-bold text-accent">Ability Checks & Saving Throws</h3>
