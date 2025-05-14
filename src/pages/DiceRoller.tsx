@@ -35,64 +35,60 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
- useEffect(() => {
-  if (!diceContainerRef.current) return;
-  
-  // Clean up any existing instance first
-  if (diceBoxRef.current) {
-    try {
-      diceBoxRef.current.clear();
-    } catch (e) {
-      console.warn("Error clearing previous DiceBox instance:", e);
-    }
-    diceBoxRef.current = null;
-  }
-
-  // Make sure the container has a proper size first
-  const container = diceContainerRef.current;
-  
-  // Configure DiceBox with proper DOM reference
-  const config = {
-    container: '#dice-box-container', // Use actual DOM element instead of selector string
-    assetPath: '/assets/dice-box/', 
-    scale: 30,
-    throwForce: 6,
-    spinForce: 3,
-    gravity: 1,
-    lightIntensity: 1,
-    shadow: true,
-    shadowTransparency: 0.8,
-    restitution: 0.7
-  };
-
-  // Create and initialize new DiceBox instance
-  console.log("Creating new DiceBox instance");
-  const newDiceBox = new DiceBox(config);
-  diceBoxRef.current = newDiceBox;
-  
-  // Initialize DiceBox
-  newDiceBox.init()
-    .then(() => {
-      console.log("DiceBox initialized successfully!");
-      setIsDiceBoxReady(true);
-    })
-    .catch((error) => {
-      console.error("Failed to initialize DiceBox:", error);
-      setIsDiceBoxReady(false);
-    });
-
-  // Clean up on component unmount
-  return () => {
+  useEffect(() => {
+    if (!diceContainerRef.current) return;
+    
+    // Clean up any existing instance first
     if (diceBoxRef.current) {
       try {
         diceBoxRef.current.clear();
       } catch (e) {
-        console.warn("Error during cleanup:", e);
+        console.warn("Error clearing previous DiceBox instance:", e);
       }
       diceBoxRef.current = null;
     }
-  };
-}, []);
+
+    // Configure DiceBox
+    const config = {
+      container: '#dice-box-container', 
+      assetPath: '/assets/dice-box/', // Path to 3D assets
+      theme: 'default',
+      offscreen: false,           // Make sure this is false to see the dice
+      scale: 30,                  // Adjust scale as needed
+      gravity: 1,
+      throwForce: 10,
+      spinForce: 5,
+      lightIntensity: 0.9,        // Brighten the scene
+      shadowTransparency: 0.8,
+    };
+
+    // Create and initialize new DiceBox instance
+    const newDiceBox = new DiceBox(config);
+    diceBoxRef.current = newDiceBox;
+    
+    // Initialize DiceBox
+    newDiceBox.init()
+      .then(() => {
+        console.log("DiceBox initialized successfully!");
+        setIsDiceBoxReady(true);
+      })
+      .catch((error) => {
+        console.error("Failed to initialize DiceBox:", error);
+        setIsDiceBoxReady(false);
+      });
+
+    // Clean up on component unmount
+    return () => {
+      if (diceBoxRef.current) {
+        try {
+          diceBoxRef.current.clear();
+        } catch (e) {
+          console.warn("Error during cleanup:", e);
+        }
+        diceBoxRef.current = null;
+      }
+    };
+  }, []);
 
   // Load saved rolls from localStorage
   useEffect(() => {
@@ -107,6 +103,9 @@ export const DiceRoller: React.FC = () => {
       const defaultRolls = [
         { name: 'Attack Roll', dice: 1, diceType: 20, modifier: 5 },
         { name: 'Damage (1d8+3)', dice: 1, diceType: 8, modifier: 3 },
+        { name: 'Fireball (8d6)', dice: 8, diceType: 6, modifier: 0 },
+        { name: 'Dagger Attack', dice: 1, diceType: 4, modifier: 3 },
+        { name: 'Greatsword (2d6+4)', dice: 2, diceType: 6, modifier: 4 },
       ];
       setSavedRolls(defaultRolls);
       localStorage.setItem('savedRolls', JSON.stringify(defaultRolls));
@@ -215,6 +214,16 @@ export const DiceRoller: React.FC = () => {
     rollDice(saved);
   };
 
+  // Common roll presets
+  const commonRolls = [
+    { name: 'Attack Roll', description: 'd20 + ability modifier + proficiency', dice: 1, diceType: 20, modifier: 5 },
+    { name: 'Damage Roll', description: 'Weapon damage + ability modifier', dice: 1, diceType: 8, modifier: 3 },
+    { name: 'Ability Check', description: 'd20 + ability modifier', dice: 1, diceType: 20, modifier: 2 },
+    { name: 'Saving Throw', description: 'd20 + saving throw modifier', dice: 1, diceType: 20, modifier: 1 },
+    { name: 'Fireball', description: '8d6 fire damage (Dex save for half)', dice: 8, diceType: 6, modifier: 0 },
+    { name: 'Sneak Attack (3rd level)', description: '2d6 extra damage', dice: 2, diceType: 6, modifier: 0 }
+  ];
+
   return (
     <div className="max-w-6xl mx-auto">
       <motion.div 
@@ -297,6 +306,8 @@ export const DiceRoller: React.FC = () => {
               <span>
                 Roll {numberOfDice}d{diceType}
                 {modifier !== 0 ? (modifier > 0 ? `+${modifier}` : modifier) : ''}
+                {diceType === 20 && advantage !== 'normal' ? 
+                  ` (${advantage === 'advantage' ? 'Advantage' : 'Disadvantage'})` : ''}
               </span>
             </button>
             
@@ -443,6 +454,29 @@ export const DiceRoller: React.FC = () => {
         className="magical-card p-6"
       >
         <h2 className="text-xl font-bold mb-4">Common Dice Rolls</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {commonRolls.map((roll, index) => (
+            <div 
+              key={index} 
+              className="bg-muted/30 p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => handleUseSavedRoll(roll)}
+            >
+              <h3 className="font-bold text-accent mb-1">{roll.name}</h3>
+              <p className="text-sm text-foreground/70 mb-2">{roll.description}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
+                  {roll.dice}d{roll.diceType}
+                  {roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ''}
+                </span>
+                <button className="text-xs bg-accent/20 hover:bg-accent/40 px-2 py-1 rounded-md">
+                  Roll
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <h3 className="font-bold text-accent">Ability Checks & Saving Throws</h3>
@@ -458,23 +492,6 @@ export const DiceRoller: React.FC = () => {
             <ul className="list-disc pl-5 text-sm">
               <li>Natural 20: Critical Hit (double damage dice)</li>
               <li>Natural 1: Critical Miss</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-bold text-accent">Advantage & Disadvantage</h3>
-            <p className="text-foreground/70 mb-2">Roll two d20s instead of one</p>
-            <ul className="list-disc pl-5 text-sm">
-              <li>Advantage: Take the higher roll</li>
-              <li>Disadvantage: Take the lower roll</li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="font-bold text-accent">Common Damage Dice</h3>
-            <p className="text-foreground/70">Weapon damage examples:</p>
-            <ul className="list-disc pl-5 text-sm">
-              <li>Dagger: 1d4 + modifier</li>
-              <li>Longsword: 1d8 + modifier</li>
-              <li>Greatsword: 2d6 + modifier</li>
             </ul>
           </div>
         </div>
