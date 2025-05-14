@@ -8,6 +8,7 @@ interface CustomDiceResult {
 	type: number;
 	value: number;
 	id: string;
+    selected?: boolean; // Added a flag to indicate if this die was selected for the total
 }
 
 interface SavedRoll {
@@ -84,7 +85,6 @@ export const DiceRoller: React.FC = () => {
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
 
-					// Moved canvas styling and pointerEvents logic inside the check
 					const diceCanvas = document.getElementById(diceCanvasId);
 					if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
 						console.log("Found dice canvas, applying full screen styles");
@@ -92,9 +92,9 @@ export const DiceRoller: React.FC = () => {
 						diceCanvas.style.position = 'fixed';
 						diceCanvas.style.top = '0';
 						diceCanvas.style.left = '0';
-						diceCanvas.style.width = '100%'; // Ensure canvas fills the screen
-						diceCanvas.style.height = '100%'; // Ensure canvas fills the screen
-						diceCanvas.style.zIndex = '1000'; // Set a high z-index to appear in front
+						diceCanvas.style.width = '100%';
+						diceCanvas.style.height = '100%';
+						diceCanvas.style.zIndex = '1000';
 						diceCanvas.style.pointerEvents = 'none'; // Initially no pointer events
 
 						const windowWidth = window.innerWidth;
@@ -102,9 +102,6 @@ export const DiceRoller: React.FC = () => {
 
 						if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 							console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-							// Note: As previously observed, this method might not exist or work in this version.
-							// We rely on CSS for sizing.
-							// diceBoxRef.current.resize(windowWidth, windowHeight);
 						} else {
 							console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
 						}
@@ -137,7 +134,6 @@ export const DiceRoller: React.FC = () => {
 
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-					// diceBoxRef.current.resize(windowWidth, windowHeight); // Still commented out
 				} else {
 					console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size and library adaptation.");
 				}
@@ -201,14 +197,12 @@ export const DiceRoller: React.FC = () => {
 		}
 	}, [savedRolls]);
 
-	// Click handler for the overlay div
 	const handleOverlayClick = () => {
 		if (diceBoxRef.current && !isRolling) {
             console.log("Overlay clicked, attempting to clear dice.");
 			diceBoxRef.current.clear();
 			setDiceResults([]);
 			setTotal(null);
-            // Disable pointer events for the canvas once cleared
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
@@ -233,7 +227,6 @@ export const DiceRoller: React.FC = () => {
 		const currentModifier = customRoll?.modifier || modifier;
 		const currentAdvantage = customRoll?.advantage || advantage;
 
-        // Enable pointer events for the canvas during rolling
         const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
         if (diceCanvas) {
             diceCanvas.style.pointerEvents = 'auto';
@@ -242,7 +235,8 @@ export const DiceRoller: React.FC = () => {
 		try {
 			let notation;
 			if (typeOfDice === 20 && currentAdvantage !== 'normal') {
-				notation = `${numDice}d20${currentAdvantage === 'advantage' ? 'kh1' : 'kl1'}`;
+				// Roll 2d20 for advantage/disadvantage
+				notation = '2d20';
 			} else {
 				notation = `${numDice}d${typeOfDice}`;
 			}
@@ -250,29 +244,53 @@ export const DiceRoller: React.FC = () => {
 			await diceBoxRef.current.clear();
 			console.log("Rolling dice with notation:", notation);
 			const rollResults = await diceBoxRef.current.roll(notation);
-			console.log("Roll results from DiceBox:", rollResults);
+			console.log("Raw roll results from DiceBox:", rollResults);
 
-			const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0);
-			setTotal(sumOfDice + currentModifier);
+            let calculatedTotal = 0;
+            let processedResults: CustomDiceResult[] = [];
+
+            if (typeOfDice === 20 && currentAdvantage !== 'normal' && rollResults.length >= 2) {
+                // Handle advantage/disadvantage for 2d20 rolls
+                const sortedResults = rollResults.sort((a: any, b: any) => a.value - b.value);
+                const selectedDie = currentAdvantage === 'advantage' ? sortedResults[sortedResults.length - 1] : sortedResults[0];
+
+                calculatedTotal = selectedDie.value + currentModifier;
+
+                processedResults = rollResults.map((d: any, index: number) => ({
+                    type: d.sides,
+                    value: d.value,
+                    id: `${Date.now()}-${index}`,
+                    selected: d.value === selectedDie.value && (currentAdvantage === 'advantage' ? d.value >= sortedResults[sortedResults.length - 1].value : d.value <= sortedResults[0].value) // Mark the selected die
+                }));
+
+            } else {
+                // Standard roll
+                const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0);
+                calculatedTotal = sumOfDice + currentModifier;
+
+                processedResults = rollResults.map((d: any, index: number) => ({
+                    type: d.sides,
+                    value: d.value,
+                    id: `${Date.now()}-${index}`,
+                    selected: true // All dice are "selected" in a normal roll
+                }));
+            }
 
 
-			setDiceResults(rollResults.map((d: any, index: number) => ({
-				type: d.sides,
-				value: d.value,
-				id: `${Date.now()}-${index}`
-			})));
+			setTotal(calculatedTotal);
+			setDiceResults(processedResults);
+
 
             diceBoxRef.current.onRollComplete = (results: any) => {
                 console.log("Roll complete:", results);
                 playSound('success');
                 setIsRolling(false);
-                // Pointer events remain 'auto' after roll complete, allowing overlay click to work
+                // Pointer events remain 'auto' for the overlay to handle the click
             };
 
 		} catch (error) {
 			console.error("Error rolling with DiceBox:", error);
 			setIsRolling(false);
-             // Ensure pointer events are disabled if rolling fails
             const diceCanvas = document.getElementById('dice-box-fullscreen-canvas');
             if (diceCanvas) {
                 diceCanvas.style.pointerEvents = 'none';
@@ -281,7 +299,15 @@ export const DiceRoller: React.FC = () => {
 	};
 
 	const getResultsString = () => {
-		if (diceResults.length === 0) return total !== null ? "Processing..." : "";
+        if (diceResults.length === 0) return total !== null ? "Processing..." : "";
+
+        if (diceType === 20 && (advantage === 'advantage' || advantage === 'disadvantage') && diceResults.length >= 2) {
+             // For advantage/disadvantage, show both dice and indicate the selected one
+             return diceResults.map(d =>
+                 d.selected ? `[${d.value}]` : d.value.toString()
+             ).join(' + ');
+        }
+
 		return diceResults.map(d => d.value.toString()).join(' + ');
 	};
 
@@ -333,7 +359,7 @@ export const DiceRoller: React.FC = () => {
 
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
-			{/* Overlay div to capture clicks when result is visible */}
+			{/* Overlay div to capture clicks when result is visible and not rolling */}
             {total !== null && !isRolling && (
                 <div
                     className="fixed inset-0 z-[999] cursor-pointer"
@@ -468,7 +494,7 @@ export const DiceRoller: React.FC = () => {
 						</p>
 						{diceResults.length > 0 && (
 							<p className="text-foreground/70 text-sm">
-								({getResultsString()})
+								{getResultsString()}
 								{modifier !== 0 ? (modifier > 0 ? ` + ${modifier}` : ` - ${Math.abs(modifier)}`) : ''}
 							</p>
 						)}
