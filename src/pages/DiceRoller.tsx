@@ -35,59 +35,38 @@ export const DiceRoller: React.FC = () => {
   const diceBoxRef = useRef<DiceBox | null>(null);
 
   // Initialize DiceBox once on component mount
-useEffect(() => {
+ useEffect(() => {
   if (!diceContainerRef.current) return;
+  
+  console.log("Starting DiceBox initialization...");
   
   // Clean up any existing instance first
   if (diceBoxRef.current) {
+    try {
+      if (typeof diceBoxRef.current.clear === 'function') {
+        diceBoxRef.current.clear();
+      }
+    } catch (e) {
+      console.warn("Error clearing previous DiceBox instance:", e);
+    }
     diceBoxRef.current = null;
   }
 
-  // Simple config with minimal settings
-  const config = {
-    container: '#dice-box-container', 
-    assetPath: '/assets/dice-box/',
-    theme: 'default',
-    scale: 20
-  };
-  
-  // Create DiceBox
-  const newDiceBox = new DiceBox(config);
-  diceBoxRef.current = newDiceBox;
-  
-  // Initialize DiceBox
-  newDiceBox.init()
-    .then(() => {
-      console.log("DiceBox initialized successfully!");
-      
-      // IMPORTANT: After initialization, find and resize the canvas
-      setTimeout(() => {
-        const canvas = document.querySelector('#dice-box-container canvas');
-        if (canvas) {
-          // Set canvas to full container size
-          canvas.style.width = '100%';
-          canvas.style.height = '100%';
-          
-          // Important: Set actual canvas dimensions
-          canvas.width = diceContainerRef.current.clientWidth;
-          canvas.height = diceContainerRef.current.clientHeight;
-        }
-      }, 100);
-      
-      setIsDiceBoxReady(true);
-    })
-    .catch((error) => {
-      console.error("Failed to initialize DiceBox:", error);
-      setIsDiceBoxReady(false);
-    });
+  try {
+    // Only use officially documented configuration options
+    const config = {
+      container: '#dice-box-container', // This is required
+      assetPath: '/assets/dice-box/',   // Path to assets
+      theme: 'default',                // Use default theme
+      scale: 20,                        // Start with a smaller scale (default is 5)
+      gravity: 1,                      // Default gravity
+      throwForce: 6,                   // Default throw force
+      spinForce: 3,                    // Default spin force
+      lightIntensity: 0.8,             // Default light intensity
+      shadowTransparency: 0.8,         // Default shadow transparency
+    };
 
-  // Clean up
-  return () => {
-    diceBoxRef.current = null;
-  };
-}, []);
-
-
+    console.log("Creating new DiceBox with config:", config);
     
     // Create new DiceBox instance
     const newDiceBox = new DiceBox(config);
@@ -394,7 +373,7 @@ useEffect(() => {
           </div>
         </div>
 
-    <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm"
+     <div className="relative rounded-lg mb-6 overflow-hidden border border-dashed border-foreground/30 bg-background/40 backdrop-blur-sm"
      style={{ minHeight: '300px', height: '300px', width: '100%' }}>
   {!isDiceBoxReady && (
     <div className="absolute inset-0 flex items-center justify-center text-foreground/50">
@@ -413,13 +392,7 @@ useEffect(() => {
   
   <div ref={diceContainerRef}
        id="dice-box-container"
-       className="absolute inset-0"
-       style={{ 
-         width: '100%', 
-         height: '100%', 
-         position: 'relative',
-         overflow: 'hidden' 
-       }}
+       style={{ width: '100%', height: '100%', position: 'relative' }}
   />
 </div>
         
