@@ -199,7 +199,7 @@ export const DiceRoller: React.FC = () => {
 
 	const handleOverlayClick = () => {
 		if (diceBoxRef.current && !isRolling) {
-            console.log("Overlay clicked, attempting to clear dice.");
+            console.log("Overlay clicked, attempting to clear dice. isRolling:", isRolling);
 			diceBoxRef.current.clear();
 			setDiceResults([]);
 			setTotal(null);
@@ -235,7 +235,7 @@ export const DiceRoller: React.FC = () => {
 		try {
 			let notation;
 			if (typeOfDice === 20 && currentAdvantage !== 'normal') {
-				// Roll 2d20 for advantage/disadvantage
+				// Always roll 2d20 for advantage/disadvantage
 				notation = '2d20';
 			} else {
 				notation = `${numDice}d${typeOfDice}`;
@@ -249,18 +249,18 @@ export const DiceRoller: React.FC = () => {
             let calculatedTotal = 0;
             let processedResults: CustomDiceResult[] = [];
 
-            if (typeOfDice === 20 && currentAdvantage !== 'normal' && rollResults.length >= 2) {
+            if (typeOfDice === 20 && (currentAdvantage === 'advantage' || currentAdvantage === 'disadvantage') && rollResults.length >= 2) {
                 // Handle advantage/disadvantage for 2d20 rolls
-                const sortedResults = rollResults.sort((a: any, b: any) => a.value - b.value);
-                const selectedDie = currentAdvantage === 'advantage' ? sortedResults[sortedResults.length - 1] : sortedResults[0];
+                const sortedResults = [...rollResults].sort((a: any, b: any) => a.value - b.value);
+                const selectedDie = currentAdvantage === 'advantage' ? sortedResults[1] : sortedResults[0]; // Index 1 for highest, 0 for lowest
 
                 calculatedTotal = selectedDie.value + currentModifier;
 
-                processedResults = rollResults.map((d: any, index: number) => ({
+                processedResults = rollResults.map((d: any) => ({ // Use original rollResults order for display
                     type: d.sides,
                     value: d.value,
-                    id: `${Date.now()}-${index}`,
-                    selected: d.value === selectedDie.value && (currentAdvantage === 'advantage' ? d.value >= sortedResults[sortedResults.length - 1].value : d.value <= sortedResults[0].value) // Mark the selected die
+                    id: d.id, // Use original ID
+                    selected: d.id === selectedDie.id // Mark the selected die by comparing original ID
                 }));
 
             } else {
@@ -268,10 +268,10 @@ export const DiceRoller: React.FC = () => {
                 const sumOfDice = rollResults.reduce((sum: number, die: any) => sum + die.value, 0);
                 calculatedTotal = sumOfDice + currentModifier;
 
-                processedResults = rollResults.map((d: any, index: number) => ({
+                processedResults = rollResults.map((d: any) => ({
                     type: d.sides,
                     value: d.value,
-                    id: `${Date.now()}-${index}`,
+                    id: d.id, // Use original ID
                     selected: true // All dice are "selected" in a normal roll
                 }));
             }
@@ -357,6 +357,14 @@ export const DiceRoller: React.FC = () => {
 	const numberOfDiceOptions = Array.from({ length: 20 }, (_, i) => i + 1);
 	const modifierOptions = Array.from({ length: 21 }, (_, i) => i - 10);
 
+    // Effect to set number of dice to 1 when advantage/disadvantage is selected
+    useEffect(() => {
+        if (diceType === 20 && advantage !== 'normal') {
+            setNumberOfDice(1);
+        }
+    }, [diceType, advantage]);
+
+
 	return (
 		<div className="max-w-6xl mx-auto relative z-20">
 			{/* Overlay div to capture clicks when result is visible and not rolling */}
@@ -385,10 +393,16 @@ export const DiceRoller: React.FC = () => {
 							value={numberOfDice}
 							onChange={(e) => setNumberOfDice(parseInt(e.target.value) || 1)}
 							className="w-full p-2 bg-muted/50 rounded-md"
+                            disabled={diceType === 20 && advantage !== 'normal'} // Disable if advantage/disadvantage is on
 						>
-							{numberOfDiceOptions.map(num => (
-								<option key={num} value={num}>{num}</option>
-							))}
+                            {/* Conditionally render options */}
+                            {diceType === 20 && advantage !== 'normal' ? (
+                                <option value={1}>1</option>
+                            ) : (
+                                numberOfDiceOptions.map(num => (
+                                    <option key={num} value={num}>{num}</option>
+                                ))
+                            )}
 						</select>
 					</div>
 
@@ -403,7 +417,12 @@ export const DiceRoller: React.FC = () => {
 								setDiceType(newDiceType);
 								if (newDiceType !== 20) {
 									setAdvantage('normal');
-								}
+								} else {
+                                    // If switching to d20, ensure number of dice is 1 if advantage/disadvantage is on
+                                    if (advantage !== 'normal') {
+                                        setNumberOfDice(1);
+                                    }
+                                }
 							}}
 							className="w-full p-2 bg-muted/50 rounded-md"
 						>
