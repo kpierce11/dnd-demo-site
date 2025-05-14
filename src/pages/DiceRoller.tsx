@@ -34,108 +34,109 @@ export const DiceRoller: React.FC = () => {
   const diceContainerRef = useRef<HTMLDivElement>(null);
   const diceBoxRef = useRef<DiceBox | null>(null);
 
-  // Initialize DiceBox once on component mount
   useEffect(() => {
-    if (!diceContainerRef.current) return;
-    
-    console.log("Starting DiceBox initialization...");
-    
-    // Clean up any existing instance first
-    if (diceBoxRef.current) {
-      try {
-        if (typeof diceBoxRef.current.clear === 'function') {
-          diceBoxRef.current.clear();
-        }
-      } catch (e) {
-        console.warn("Error clearing previous DiceBox instance:", e);
-      }
-      diceBoxRef.current = null;
+    if (!diceContainerRef.current) {
+      console.warn("Dice container ref not available yet.");
+      return;
     }
+    
+    console.log("Starting DiceBox initialization effect...");
+    
+    let currentDiceBoxInstance: DiceBox | null = null;
 
-    try { // This is the try block that was missing its catch
+    try {
       const config = {
-        container: '#dice-box-container',
+        container: '#dice-box-container', // Critical: Matches the div ID
         assetPath: '/assets/dice-box/',
         theme: 'default',
-        scale: 20,
+        scale: 20, // Adjust for dice size within the canvas
         gravity: 1,
         throwForce: 6,
         spinForce: 3,
         lightIntensity: 0.8,
         shadowTransparency: 0.8,
+        // Consider adding width/height to config if DiceBox supports it
+        // and if it helps with OffscreenCanvas sizing.
+        // For example:
+        // width: diceContainerRef.current.clientWidth,
+        // height: diceContainerRef.current.clientHeight,
       };
 
-      console.log("Creating new DiceBox with config:", config);
+      console.log("Creating new DiceBox with config:", config, "Container Element:", document.querySelector(config.container));
       
-      const newDiceBox = new DiceBox(config);
-      diceBoxRef.current = newDiceBox;
+      // Ensure existing DiceBox is cleared if re-initializing (though useEffect with [] should prevent this unless parent re-mounts)
+      if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+          try {
+            diceBoxRef.current.clear(); // Or .destroy() if it exists
+          } catch(e) { console.warn("Error clearing previous DiceBox", e); }
+      }
+      
+      currentDiceBoxInstance = new DiceBox(config);
+      diceBoxRef.current = currentDiceBoxInstance;
 
       console.log("Initializing DiceBox...");
-      newDiceBox.init()
-        .then(() => { // For successful init
+      currentDiceBoxInstance.init()
+        .then(() => {
           console.log("DiceBox initialized successfully!");
-          
-          setTimeout(() => {
-            if (diceContainerRef.current) {
-              const canvasEl = diceContainerRef.current.querySelector('canvas');
-              if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-                console.log(`DiceBox canvas (ID: ${canvasEl.id || 'none'}) found.`);
-                // NOTE: Direct canvas width/height manipulation was removed previously
-                // due to 'transferControlToOffscreen' errors.
-                // Ensure container is styled correctly via CSS.
-                canvasEl.style.width = '100%';
-                canvasEl.style.height = '100%';
-              } else {
-                console.warn("DiceBox canvas not found within #dice-box-container during initial check.");
-              }
-            }
-          }, 100);
-          
           setIsDiceBoxReady(true);
+
+          // Style the canvas created by DiceBox to fill its container
+          // Do NOT set .width or .height attributes directly after transferControlToOffscreen
+          if (diceContainerRef.current) {
+            const canvasEl = diceContainerRef.current.querySelector('canvas');
+            if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+              console.log(`DiceBox canvas (ID: ${canvasEl.id || 'none'}) found. Applying styles to fill container.`);
+              canvasEl.style.width = '100%';
+              canvasEl.style.height = '100%';
+              // Important: Ensure the container itself (#dice-box-container)
+              // has the desired dimensions via CSS for '100%' to work.
+            } else {
+              console.warn("DiceBox canvas not found within #dice-box-container after init.");
+            }
+          }
         })
-        .catch((initError) => { // Catch for init() errors
+        .catch((initError) => {
           console.error("Failed to initialize DiceBox:", initError);
           setIsDiceBoxReady(false);
         });
-
-      // The handleResize definition and event listener setup are now OUTSIDE the inner try-catch for init,
-      // but still within the main useEffect callback, and importantly, AFTER the try-catch for DiceBox instantiation.
-      // This ensures they are set up if DiceBox instantiation itself doesn't throw an error.
-
-    } catch (creationError) { // This is the added catch for the outer try block
+    } catch (creationError) {
       console.error("Error creating DiceBox instance:", creationError);
       setIsDiceBoxReady(false);
     }
 
-    // Setup handleResize listener
     const handleResize = () => {
       console.log("Window resize event triggered.");
       if (diceContainerRef.current) {
         const canvasEl = diceContainerRef.current.querySelector('canvas');
         if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
-            // NOTE: Direct canvas width/height manipulation was removed previously.
-            // Re-apply styles if needed to ensure it fills the container after resize.
             canvasEl.style.width = '100%';
             canvasEl.style.height = '100%';
-            console.log(`DiceBox canvas styles re-applied. Container: ${diceContainerRef.current.clientWidth}x${diceContainerRef.current.clientHeight}`);
+            console.log(`DiceBox canvas styles re-applied on resize. Container: ${diceContainerRef.current.clientWidth}x${diceContainerRef.current.clientHeight}`);
+            
+            // If DiceBox API offers a way to update viewport for OffscreenCanvas, call it here.
+            // e.g., if (diceBoxRef.current && typeof diceBoxRef.current.updateViewport === 'function') {
+            //   diceBoxRef.current.updateViewport();
+            // }
         }
       }
     };
     window.addEventListener('resize', handleResize);
 
-    // Cleanup
     return () => {
+      console.log("Cleaning up DiceBox effect...");
       window.removeEventListener('resize', handleResize);
-      if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+      if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') { // Or .destroy()
         try {
+          console.log("Clearing DiceBox instance.");
           diceBoxRef.current.clear();
-        } catch(e) {
+        } catch (e) {
           console.warn("Error during DiceBox cleanup:", e);
         }
       }
       diceBoxRef.current = null;
     };
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount and cleans up on unmount.
+
 
   // Load saved rolls from localStorage
   useEffect(() => {
@@ -168,7 +169,7 @@ export const DiceRoller: React.FC = () => {
 
   const rollDice = async (customRoll?: SavedRoll) => {
     if (!diceBoxRef.current || !isDiceBoxReady) {
-      console.warn("DiceBox not ready for roll.");
+      console.warn("DiceBox not ready for roll. isDiceBoxReady:", isDiceBoxReady, "diceBoxRef.current:", diceBoxRef.current);
       return;
     }
     
@@ -190,8 +191,10 @@ export const DiceRoller: React.FC = () => {
         notation = `${numDice}d${typeOfDice}`;
       }
 
-      await diceBoxRef.current.clear();
+      await diceBoxRef.current.clear(); // Clear previous dice
+      console.log("Rolling dice with notation:", notation);
       const rollResults = await diceBoxRef.current.roll(notation);
+      console.log("Roll results from DiceBox:", rollResults);
       
       if (currentAdvantage !== 'normal' && typeOfDice === 20) {
         rollResults.sort((a, b) => 
@@ -204,7 +207,7 @@ export const DiceRoller: React.FC = () => {
         setTotal(sumOfDice + currentModifier);
       }
       
-      setDiceResults(rollResults.map((d, index) => ({ 
+      setDiceResults(rollResults.map((d: any, index: number) => ({ 
         type: d.sides, 
         value: d.value, 
         id: `${Date.now()}-${index}` 
@@ -379,7 +382,7 @@ export const DiceRoller: React.FC = () => {
   )}
   
   <div ref={diceContainerRef}
-       id="dice-box-container"
+       id="dice-box-container" // This ID is used by DiceBox config
        style={{ width: '100%', height: '100%', position: 'relative' }}
   />
 </div>
