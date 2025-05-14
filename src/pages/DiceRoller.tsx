@@ -69,7 +69,7 @@ export const DiceRoller: React.FC = () => {
     const config = {
       container: '#dice-box-container', 
       assetPath: '/assets/dice-box/', 
-      scale: 30,
+      scale: 20,
       shadowTransparency: 0.8,
     };
 
