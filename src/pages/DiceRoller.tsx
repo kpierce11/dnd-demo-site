@@ -81,32 +81,39 @@ export const DiceRoller: React.FC = () => {
       .then(() => {
         console.log("DiceBox initialized successfully!");
 
+        // Apply styles to the canvas container to fill its parent.
+        // The canvas element itself will be managed by DiceBox via OffscreenCanvas.
+        // We no longer directly set canvas width/height attributes here.
+
         // Find the canvas element created by DiceBox within the container
-        // Instead of relying on a fixed ID 'dice-canvas', find the canvas child
+        // This is still needed to apply CSS styles to the canvas element itself
         setTimeout(() => {
-          const diceCanvas = diceContainerRef.current?.querySelector('canvas'); // MODIFIED LINE
+          const diceCanvas = diceContainerRef.current?.querySelector('canvas');
 
           if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-            console.log("Found dice canvas, resizing it");
+            console.log("Found dice canvas, applying styles and attempting resize via library if supported");
 
-            const containerWidth = diceContainerRef.current.clientWidth;
-            const containerHeight = diceContainerRef.current.clientHeight;
-
-            diceCanvas.width = containerWidth;
-            diceCanvas.height = containerHeight;
-
+            // Apply styles to make canvas fill its container (CSS handles sizing)
             diceCanvas.style.width = '100%';
             diceCanvas.style.height = '100%';
-            // Keep position absolute if its parent is relative
-            diceCanvas.style.position = 'absolute';
+            diceCanvas.style.position = 'absolute'; // Should match container's positioning context
             diceCanvas.style.top = '0';
             diceCanvas.style.left = '0';
 
+            // Get current container dimensions to potentially inform the library
+            const containerWidth = diceContainerRef.current.clientWidth;
+            const containerHeight = diceContainerRef.current.clientHeight;
 
-            console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
-             // If DiceBox has a method to update its rendering based on canvas resize, call it here.
-             // Based on documentation review, there isn't an explicit method. The canvas resize might be enough.
-             // If dice appear distorted or improperly rendered after resize, further investigation into DiceBox API or potential workarounds might be necessary.
+            // *** Attempt to resize via DiceBox API ***
+            // Check if a resize method exists on the DiceBox instance
+            if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+                console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
+                diceBoxRef.current.resize(containerWidth, containerHeight); // Call the hypothetical resize method
+            } else {
+                console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
+                // If no resize method, we rely on the library to potentially pick up the DOM element's size changes via its own internal mechanisms.
+            }
+
           } else {
             console.warn("Dice canvas not found within container after initialization.");
              const allCanvases = document.querySelectorAll('canvas');
@@ -128,13 +135,20 @@ export const DiceRoller: React.FC = () => {
 
   const handleResize = () => {
      // Find the canvas element created by DiceBox within the container on resize
-    const diceCanvas = diceContainerRef.current?.querySelector('canvas'); // MODIFIED LINE
+    const diceCanvas = diceContainerRef.current?.querySelector('canvas');
 
     if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-      diceCanvas.width = diceContainerRef.current.clientWidth;
-      diceCanvas.height = diceContainerRef.current.clientHeight;
-      console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
-       // Potentially call a DiceBox resize method if one existed.
+      console.log("Window resized, found dice canvas, attempting resize via library if supported");
+      const containerWidth = diceContainerRef.current.clientWidth;
+      const containerHeight = diceContainerRef.current.clientHeight;
+
+       // *** Attempt to resize via DiceBox API on window resize ***
+       if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+           console.log(`Attempting to resize DiceBox via resize method to ${containerWidth}x${containerHeight}`);
+           diceBoxRef.current.resize(containerWidth, containerHeight); // Call the hypothetical resize method
+       } else {
+           console.warn("DiceBox resize method not found or supported. Relying on CSS for canvas size.");
+       }
     }
   };
 
