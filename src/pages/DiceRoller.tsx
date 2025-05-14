@@ -71,12 +71,45 @@ export const DiceRoller: React.FC = () => {
     // Create new DiceBox instance
     const newDiceBox = new DiceBox(config);
     diceBoxRef.current = newDiceBox;
-    
-    // Initialize DiceBox
-    console.log("Initializing DiceBox...");
+    // Initialize dicebox 
+     console.log("Initializing DiceBox...");
     newDiceBox.init()
       .then(() => {
         console.log("DiceBox initialized successfully!");
+        
+        // After initialization, find the dice canvas and resize it
+        setTimeout(() => {
+          // Allow a brief delay for rendering
+          const diceCanvas = document.getElementById('dice-canvas');
+          if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
+            console.log("Found dice canvas, resizing it");
+            
+            // Get the container dimensions
+            const containerWidth = diceContainerRef.current?.clientWidth || 1000;
+            const containerHeight = diceContainerRef.current?.clientHeight || 290;
+            
+            // Set canvas dimensions to match container
+            diceCanvas.width = containerWidth;
+            diceCanvas.height = containerHeight;
+            
+            // Update styles to fill the container
+            diceCanvas.style.width = '100%';
+            diceCanvas.style.height = '100%';
+            diceCanvas.style.position = 'absolute';
+            diceCanvas.style.top = '0';
+            diceCanvas.style.left = '0';
+            
+            console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
+          } else {
+            console.warn("Dice canvas not found or not a canvas element");
+            
+            // List all canvases to help debug
+            const allCanvases = document.querySelectorAll('canvas');
+            console.log(`Found ${allCanvases.length} canvas elements:`, 
+                         Array.from(allCanvases).map(c => c.id || 'unnamed canvas'));
+          }
+        }, 100);
+        
         setIsDiceBoxReady(true);
       })
       .catch((error) => {
@@ -88,12 +121,23 @@ export const DiceRoller: React.FC = () => {
     setIsDiceBoxReady(false);
   }
 
-  // Clean up on component unmount - simplified
-  return () => {
-    if (diceBoxRef.current) {
-      // Don't try to call any methods that might not exist
-      diceBoxRef.current = null;
+  // Add window resize handler
+  const handleResize = () => {
+    const diceCanvas = document.getElementById('dice-canvas');
+    if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
+      // Update canvas dimensions when window resizes
+      diceCanvas.width = diceContainerRef.current.clientWidth;
+      diceCanvas.height = diceContainerRef.current.clientHeight;
+      console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
     }
+  };
+  
+  window.addEventListener('resize', handleResize);
+
+  // Clean up on component unmount
+  return () => {
+    window.removeEventListener('resize', handleResize);
+    diceBoxRef.current = null;
   };
 }, []);
 
