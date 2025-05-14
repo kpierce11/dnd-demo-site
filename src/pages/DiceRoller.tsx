@@ -74,7 +74,16 @@ export const DiceRoller: React.FC = () => {
       container: '#dice-box-container', 
       assetPath: '/assets/dice-box/', 
       scale: 20,
+      gravity: 1,
+      throwForce: 10,
       shadowTransparency: 0.8,
+      makeUI: false,
+      origin: 'center',
+      radius: 0,
+      dimensions:{
+        w: container.clientWidth,
+        h: container.clientHeight
+      }
     };
 
     console.log("Creating new DiceBox with config:", config);
