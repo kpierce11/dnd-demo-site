@@ -33,6 +33,8 @@ export const DiceRoller: React.FC = () => {
 	const { playSound } = useAudio();
 	// Removed diceContainerRef as we'll use document.body directly for the canvas container
 	const diceBoxRef = useRef<DiceBox | null>(null);
+    const handleCanvasClickRef = useRef<((event: MouseEvent) => void) | null>(null); // Ref for the click handler
+
 
 	useEffect(() => {
 		// No need to check a specific container ref here, as we're targeting the body
@@ -61,7 +63,7 @@ export const DiceRoller: React.FC = () => {
 		// We'll rely on a specific ID for the canvas for easier finding and removal
 		const diceCanvasId = 'dice-box-fullscreen-canvas'; // Define a unique ID
 		const existingCanvas = document.getElementById(diceCanvasId);
-		if (existingCanvas && existingCanvas.parentNode === document.body) {
+		if (existingCanvas && existingCanvas instanceof HTMLCanvasElement && existingCanvas.parentNode === document.body) {
 			console.log("Removing existing DiceBox canvas from body before initialization:", existingCanvas);
 			document.body.removeChild(existingCanvas);
 		}
@@ -97,7 +99,7 @@ export const DiceRoller: React.FC = () => {
 						const diceCanvas = document.getElementById(diceCanvasId);
 
 						if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-							console.log("Found dice canvas, applying full screen styles");
+							console.log("Found dice canvas, applying full screen styles and adding click handler");
 
 							// Apply styles to make canvas fill the viewport and position it fixed
 							diceCanvas.style.position = 'fixed';
@@ -105,10 +107,19 @@ export const DiceRoller: React.FC = () => {
 							diceCanvas.style.left = '0';
 							diceCanvas.style.width = '100%';
 							diceCanvas.style.height = '100%';
-							diceCanvas.style.zIndex = '-1'; // Position behind other content
-							diceCanvas.style.pointerEvents = 'none'; // Allow interaction with elements above
+							diceCanvas.style.zIndex = '100'; // Position ON TOP of other content - INCREASED Z-INDEX
+							diceCanvas.style.pointerEvents = 'auto'; // ALLOW interaction with the canvas - REMOVED pointerEvents: 'none'
 
-							// No need to explicitly resize canvas width/height attributes if relying on CSS and library adapts
+
+							// Add click listener to clear dice
+							handleCanvasClickRef.current = () => { // Define click handler and store in ref
+								if (diceBoxRef.current) {
+									console.log("Canvas clicked, clearing dice.");
+									diceBoxRef.current.clear();
+								}
+							};
+							diceCanvas.addEventListener('click', handleCanvasClickRef.current);
+
 
 							// Get current window dimensions to potentially inform the library
 							const windowWidth = window.innerWidth;
@@ -169,6 +180,14 @@ export const DiceRoller: React.FC = () => {
 
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			// Find the canvas element to remove the click listener before cleanup
+            const diceCanvas = document.getElementById(diceCanvasId);
+            if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && handleCanvasClickRef.current) {
+                console.log("Removing canvas click listener during cleanup.");
+                diceCanvas.removeEventListener('click', handleCanvasClickRef.current);
+            }
+
+
 			if (diceBoxRef.current) {
 				try {
 					if (typeof diceBoxRef.current.clear === 'function') {
@@ -324,17 +343,79 @@ export const DiceRoller: React.FC = () => {
 
 	return (
 		// The main container for DiceRoller content - will be overlaid on the full-screen canvas
-		// Position relative and z-index higher than canvas (z-index: -1)
+		// Position relative and z-index higher than canvas
 		<div className="max-w-6xl mx-auto relative z-20">
 			<motion.div
 				initial={{ opacity: 0, y: 20 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ duration: 0.5 }}
-				className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // flex-grow here is important for layout to work
+				className="magical-card mb-8 p-6 md:p-8 flex flex-col flex-grow" // flex flex-col is crucial for internal layout
 			>
 				<h1 className="text-3xl font-bold text-center mb-6 glow-text">Dice Roller</h1>
 
+				{/* Dice Controls (Number, Type, Modifier, Advantage/Disadvantage) */}
 				<div className="mb-8">
+					<div className="flex flex-col md:flex-row md:items-center mb-6 gap-4 flex-wrap"> {/* Added flex wrap */}
+						<div className="flex items-center">
+							<label htmlFor="diceCount" className="mr-2 w-auto md:w-20">Dice:</label>
+							<select
+								id="diceCount"
+								className="bg-muted text-foreground p-2 rounded-md w-20"
+								value={numberOfDice}
+								onChange={(e) => setNumberOfDice(parseInt(e.target.value))}
+								disabled={isRolling || !isDiceBoxReady}
+							>
+								{Array.from({ length: 20 }, (_, i) => i + 1).map(num => (
+									<option key={num} value={num}>{num}</option>
+								))}
+							</select>
+						</div>
+
+						<div className="flex items-center">
+							<span className="mx-2 text-xl">d</span>
+							<select
+								className="bg-muted text-foreground p-2 rounded-md w-20"
+								value={diceType}
+								onChange={(e) => {
+									const newType = parseInt(e.target.value);
+									setDiceType(newType);
+									if (newType !== 20) setAdvantage('normal');
+								}}
+								disabled={isRolling || !isDiceBoxReady}
+							>
+								{[4, 6, 8, 10, 12, 20, 100].map(typeValue => (
+									<option key={typeValue} value={typeValue}>{typeValue}</option>
+								))}
+							</select>
+						</div>
+
+						<div className="flex items-center">
+							<span className="mx-2 text-xl">+</span>
+							<input
+								type="number"
+								className="bg-muted text-foreground p-2 rounded-md w-20"
+								value={modifier}
+								onChange={(e) => setModifier(parseInt(e.target.value) || 0)}
+								disabled={isRolling || !isDiceBoxReady}
+							/>
+						</div>
+
+						{diceType === 20 && (
+							<div className="flex items-center ml-0 md:ml-4">
+								<select
+									className="bg-muted text-foreground p-2 rounded-md w-full md:w-40"
+									value={advantage}
+									onChange={(e) => setAdvantage(e.target.value)}
+									disabled={isRolling || !isDiceBoxReady}
+								>
+									<option value="normal">Normal Roll</option>
+									<option value="advantage">Advantage</option>
+									<option value="disadvantage">Disadvantage</option>
+								</select>
+							</div>
+						)}
+					</div>
+					{/* Roll/Save buttons - Kept within the controls div */}
 					<div className="flex flex-col sm:flex-row gap-4 justify-center">
 						<button
 							className="bg-primary hover:bg-primary/80 text-white py-3 px-6 rounded-lg flex items-center justify-center gap-2 transition-all duration-300 disabled:opacity-50"
@@ -361,10 +442,13 @@ export const DiceRoller: React.FC = () => {
 					</div>
 				</div>
 
-				{/* Removed the dice visual container div and dice-box-container div */}
-				{/* The canvas will be full screen, managed by DiceBox and styled in useEffect */}
+				{/* Placeholder div to maintain flex layout where the canvas used to be */}
+				{/* This div takes up the flexible space within the magical-card */}
+				<div className="flex-grow">
+					{/* This div is intentionally left blank */}
+				</div>
 
-
+				{/* Total Result Display */}
 				{total !== null && !isRolling && (
 					<motion.div
 						initial={{ opacity: 0 }}
@@ -381,6 +465,7 @@ export const DiceRoller: React.FC = () => {
 					</motion.div>
 				)}
 
+				{/* Saved Rolls Section */}
 				<div>
 					<h3 className="text-xl font-bold mb-3">Saved Rolls</h3>
 					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
