@@ -133,6 +133,7 @@ export const DiceRoller: React.FC = () => {
       canvasEl.height = containerHeight;
       console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
     }
+    }
   };
   
   window.addEventListener('resize', handleResize);
