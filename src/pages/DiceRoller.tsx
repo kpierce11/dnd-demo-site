@@ -36,72 +36,38 @@ export const DiceRoller: React.FC = () => {
 
 	const { playSound } = useAudio();
 	const diceBoxRef = useRef<DiceBox | null>(null);
-    const diceCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    // Removed diceCanvasRef as we will let DiceBox manage the canvas creation
+
 
 	useEffect(() => {
 		console.log("Starting DiceBox initialization (Full Screen)...");
 
-		const diceCanvasId = 'dice-box-fullscreen-canvas';
-		let diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
-
-        // If a canvas with the ID exists, check if it seems like one we created
-        // and remove it to prevent potential conflicts in Strict Mode.
-		if (diceCanvas && diceCanvas.parentNode === document.body) {
-            // Simple check: if it has our z-index and pointer-events style, assume it's ours
-             if (diceCanvas.style.zIndex === '1000' && (diceCanvas.style.pointerEvents === 'none' || diceCanvas.style.pointerEvents === 'auto')) {
-                console.log("Removing existing DiceBox canvas from body before initialization (likely Strict Mode leftover):", diceCanvas);
-                document.body.removeChild(diceCanvas);
-                diceCanvas = null; // Clear the reference after removing
-             } else {
-                 console.log("Found existing canvas with DiceBox ID, but it doesn't match expected styles. Assuming it's not ours:", diceCanvas);
-                 // If it's not ours, we shouldn't remove it. We might encounter issues if another script uses the same ID.
-                 // For now, we'll proceed and DiceBox might use this existing canvas.
-             }
+		// Clean up previous DiceBox instance if it exists
+		if (diceBoxRef.current) {
+			try {
+				if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+					diceBoxRef.current.clear();
+				}
+				if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
+					diceBoxRef.current.dispose();
+				} else if (diceBoxRef.current && typeof diceBoxRef.current.destroy === 'function') {
+					diceBoxRef.current.destroy();
+				}
+			} catch (e) {
+				console.warn("Error cleaning up previous DiceBox instance:", e);
+			}
+			diceBoxRef.current = null;
 		}
 
-        // Create a new canvas if it doesn't exist or was removed
-        if (!diceCanvas) {
-            diceCanvas = document.createElement('canvas');
-            diceCanvas.id = diceCanvasId;
-            // Do NOT append to body here, let DiceBox config handle it if needed,
-            // or append it after setting attributes if DiceBox doesn't.
-            console.log("Created new DiceBox canvas:", diceCanvas);
-        }
+		const diceCanvasId = 'dice-box-fullscreen-canvas';
 
-        // Store canvas in a ref
-        diceCanvasRef.current = diceCanvas;
-
-
-        // Apply canvas CSS styles *before* initializing DiceBox
-        console.log("Applying initial canvas full screen styles (CSS)");
-        diceCanvas.style.position = 'fixed';
-        diceCanvas.style.top = '0';
-        diceCanvas.style.left = '0';
-        diceCanvas.style.width = '100%';
-        diceCanvas.style.height = '100%';
-        diceCanvas.style.zIndex = '1000';
-        diceCanvas.style.pointerEvents = 'none';
-
-
-        // Set canvas resolution attributes *before* initializing DiceBox
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        diceCanvas.width = windowWidth;
-        diceCanvas.height = windowHeight;
-        console.log(`Set initial canvas resolution attributes to ${windowWidth}x${windowHeight}`);
-
-        // Append to body if DiceBox config doesn't handle it.
-        // Based on the config `container: 'body'`, DiceBox might append it itself,
-        // but explicitly appending here ensures it's in the DOM before init.
-         if (!document.body.contains(diceCanvas)) {
-             document.body.appendChild(diceCanvas);
-             console.log("Appended DiceBox canvas to body:", diceCanvas);
-         }
+        // We are now relying on DiceBox configuration to create and manage the canvas in the body.
+        // We will not manually create or append the canvas element here.
 
 
 		try {
 			const config = {
-				container: 'body', // Keep container as body
+				container: 'body', // DiceBox will look for or create the canvas in the body
 				assetPath: '/assets/dice-box/',
 				theme: 'default',
 				scale: 20,
@@ -110,7 +76,7 @@ export const DiceRoller: React.FC = () => {
 				spinForce: 3,
 				lightIntensity: 0.8,
 				shadowTransparency: 0.8,
-				id: diceCanvasId, // Use the ID of the canvas we created
+				id: diceCanvasId, // DiceBox will use this ID for the canvas
 			};
 
 			console.log("Creating new DiceBox with config:", config);
@@ -123,11 +89,32 @@ export const DiceRoller: React.FC = () => {
 				.then(() => {
 					console.log("DiceBox initialized successfully!");
 
-					if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
-						console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
-                        diceBoxRef.current.resize(windowWidth, windowHeight);
+                    // Get the canvas element after DiceBox has initialized it
+                    const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
+
+					if (diceCanvas) {
+						console.log("Found dice canvas after initialization.");
+                        // Initial pointer-events should be none when not rolling
+                        diceCanvas.style.pointerEvents = 'none';
+
+                        // Setting attributes here again, although InvalidStateError suggests this might not work
+                        // if transferControlToOffscreen is used. Leaving for now to see behavior.
+                        const windowWidth = window.innerWidth;
+                        const windowHeight = window.innerHeight;
+                        diceCanvas.width = windowWidth;
+                        diceCanvas.height = windowHeight;
+                         console.log(`Attempted to set canvas resolution attributes after init to ${windowWidth}x${windowHeight}`);
 					} else {
-						console.warn("DiceBox resize method not found or supported. Relying on setting attributes for resolution.");
+						console.warn(`Dice canvas with ID '${diceCanvasId}' not found after DiceBox initialization.`);
+					}
+
+
+					if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
+						console.log(`Attempting to resize DiceBox via resize method to ${window.innerWidth}x${window.innerHeight}`);
+                         // Call resize after init
+                        diceBoxRef.current.resize(window.innerWidth, window.innerHeight);
+					} else {
+						console.warn("DiceBox resize method not found or supported.");
 					}
 
 					setIsDiceBoxReady(true);
@@ -142,24 +129,24 @@ export const DiceRoller: React.FC = () => {
 		}
 
 		const handleResize = () => {
-            const canvas = diceCanvasRef.current;
+            const diceCanvas = document.getElementById(diceCanvasId) as HTMLCanvasElement | null;
 
-			if (canvas && canvas instanceof HTMLCanvasElement) {
+			if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
 				console.log("Window resized, found dice canvas");
 				const windowWidth = window.innerWidth;
 				const windowHeight = window.innerHeight;
 
-				// Update canvas resolution on resize
-				canvas.width = windowWidth;
-				canvas.height = windowHeight;
-                console.log(`Updated canvas resolution attributes to ${windowWidth}x${windowHeight}`);
+				// Update canvas resolution on resize (may cause error if OffscreenCanvas is used)
+				diceCanvas.width = windowWidth;
+				diceCanvas.height = windowHeight;
+                console.log(`Updated canvas resolution attributes on resize to ${windowWidth}x${windowHeight}`);
 
 
 				if (diceBoxRef.current && typeof diceBoxRef.current.resize === 'function') {
 					console.log(`Attempting to resize DiceBox via resize method to ${windowWidth}x${windowHeight}`);
                     diceBoxRef.current.resize(windowWidth, windowHeight);
 				} else {
-					console.warn("DiceBox resize method not found or supported. Relying on setting attributes for resolution.");
+					console.warn("DiceBox resize method not found or supported.");
 				}
 			}
 		};
@@ -173,6 +160,7 @@ export const DiceRoller: React.FC = () => {
 			if (diceBoxRef.current) {
 				try {
 					if (diceBoxRef.current && typeof diceBoxRef.current.clear === 'function') {
+				        console.log("Cleaning up DiceBox instance.");
 						diceBoxRef.current.clear();
 					}
 					if (diceBoxRef.current && typeof diceBoxRef.current.dispose === 'function') {
@@ -185,15 +173,14 @@ export const DiceRoller: React.FC = () => {
 				}
 			}
 
-            // Clean up the canvas element from the body using the ref
-			const canvas = diceCanvasRef.current;
-			if (canvas && canvas.parentNode === document.body) {
-				console.log("Removing DiceBox canvas from body during cleanup:", canvas);
-				document.body.removeChild(canvas);
+            // Clean up the canvas element if DiceBox created it in the body
+			const diceCanvas = document.getElementById(diceCanvasId);
+			if (diceCanvas && diceCanvas.parentNode === document.body) {
+				console.log("Removing DiceBox canvas from body during cleanup:", diceCanvas);
+				document.body.removeChild(diceCanvas);
 			}
 
 			diceBoxRef.current = null;
-            diceCanvasRef.current = null;
 		};
 	}, []);
 
@@ -573,7 +560,7 @@ export const DiceRoller: React.FC = () => {
 									onClick={() => handleDeleteSavedRoll(index)}
 									aria-label={`Delete saved roll: ${saved.name}`}
 								>
-									<X size={14} />
+									X size={14} />
 								</button>
 
 								<div onClick={() => handleUseSavedRoll(saved)} className="cursor-pointer">
@@ -673,7 +660,7 @@ export const DiceRoller: React.FC = () => {
 							<div className="flex justify-between items-center">
 								<span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
 									{roll.dice}d{roll.diceType}
-									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ''}
+									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
 								</span>
 								<button
 									tabIndex={-1}
@@ -782,7 +769,7 @@ export const DiceRoller: React.FC = () => {
 							<div className="flex justify-between items-center">
 								<span className="text-sm font-mono bg-primary/20 px-2 py-1 rounded">
 									{roll.dice}d{roll.diceType}
-									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : roll.modifier) : ''}
+									{roll.modifier !== 0 ? (roll.modifier > 0 ? `+${roll.modifier}` : modifier) : ''}
 								</span>
 								<button
 									tabIndex={-1}
