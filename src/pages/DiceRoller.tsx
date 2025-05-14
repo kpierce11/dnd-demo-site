@@ -79,25 +79,23 @@ export const DiceRoller: React.FC = () => {
         
         // After initialization, find the dice canvas and resize it
         setTimeout(() => {
-          // Allow a brief delay for rendering
-          const diceCanvas = document.getElementById('dice-canvas');
-          if (diceCanvas && diceCanvas instanceof HTMLCanvasElement) {
-            console.log("Found dice canvas, resizing it");
-            
-            // Get the container dimensions
-            const containerWidth = diceContainerRef.current?.clientWidth || 1000;
-            const containerHeight = diceContainerRef.current?.clientHeight || 290;
-            
-            // Set canvas dimensions to match container
-            diceCanvas.width = containerWidth;
-            diceCanvas.height = containerHeight;
-            
-            // Update styles to fill the container
-            diceCanvas.style.width = '100%';
-            diceCanvas.style.height = '100%';
-            diceCanvas.style.position = 'absolute';
-            diceCanvas.style.top = '0';
-            diceCanvas.style.left = '0';
+    if (diceContainerRef.current) {
+      // Select the canvas created by DiceBox inside the container
+      const canvasEl = diceContainerRef.current.querySelector('canvas');
+
+      if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+        console.log(`Found DiceBox canvas (ID: ${canvasEl.id || 'none'}), resizing it.`);
+        
+        const containerWidth = diceContainerRef.current.clientWidth;
+        const containerHeight = diceContainerRef.current.clientHeight;
+        
+        // Set canvas actual drawing dimensions
+        canvasEl.width = containerWidth;
+        canvasEl.height = containerHeight;
+        
+        // Set canvas style dimensions to fill the container
+        canvasEl.style.width = '100%';
+        canvasEl.style.height = '100%';
             
             console.log(`Resized dice canvas to ${containerWidth}x${containerHeight}`);
           } else {
@@ -123,11 +121,14 @@ export const DiceRoller: React.FC = () => {
 
   // Add window resize handler
   const handleResize = () => {
-    const diceCanvas = document.getElementById('dice-canvas');
-    if (diceCanvas && diceCanvas instanceof HTMLCanvasElement && diceContainerRef.current) {
-      // Update canvas dimensions when window resizes
-      diceCanvas.width = diceContainerRef.current.clientWidth;
-      diceCanvas.height = diceContainerRef.current.clientHeight;
+  if (diceContainerRef.current) {
+    const canvasEl = diceContainerRef.current.querySelector('canvas');
+    if (canvasEl && canvasEl instanceof HTMLCanvasElement) {
+      const containerWidth = diceContainerRef.current.clientWidth;
+      const containerHeight = diceContainerRef.current.clientHeight;
+      
+      canvasEl.width = containerWidth;
+      canvasEl.height = containerHeight;
       console.log(`Resized dice canvas to ${diceCanvas.width}x${diceCanvas.height}`);
     }
   };
